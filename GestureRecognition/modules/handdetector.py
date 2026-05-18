@@ -131,7 +131,12 @@ class HandDetector(Module):
             Ein leeres Dictionary.
         """
 
-        model_path = get_nested_key(data, "config", "handdetector_model_path", default="hand_landmarker.task")
+        # Try to get model path from config, fallback to default
+        model_path = "hand_landmarker.task"
+        if "config" in data:
+            config = data["config"]
+            if isinstance(config, dict) and "handdetector_model_path" in config:
+                model_path = config["handdetector_model_path"]
 
         base_options = python.BaseOptions(model_asset_path=model_path)
 
@@ -211,7 +216,7 @@ class HandDetector(Module):
             if result.handedness:
                 for hand_lms in result.hand_landmarks:
                     draw_hand_landmarks(hand_lms, galy)
-                    
+
             return {"detector": result, "galy": galy}
 
         return {}
