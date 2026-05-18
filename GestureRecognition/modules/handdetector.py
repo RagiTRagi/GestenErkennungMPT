@@ -207,9 +207,11 @@ class HandDetector(Module):
             result = self.detector.detect(mp_image)
 
             galy = GALY()
+
             if result.handedness:
-                for hand in result.handedness:
-                    draw_hand_landmarks(result.hand_landmarks[hand.index], galy)
+                for hand_lms in result.hand_landmarks:
+                    draw_hand_landmarks(hand_lms, galy)
+                    
             return {"detector": result, "galy": galy}
 
         return {}
