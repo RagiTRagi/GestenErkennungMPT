@@ -100,6 +100,14 @@ class TrailMarker(Module):
         dict
             Ein leeres Dictionary.
         """
+        self.landmark = data["detector"]
+        #self.landmark_x = self.landmark_points[:, 0]
+        #self.landmark_y = self.landmark_points[:, 1]
+        print("Daten:", self.landmark)
+        self.finger_index = 1 # Idee: landmark points werden von jedem finger getrackt und 
+        # gesammelt -> mit slicing/indexing auf die zugehörigen Daten zugreifen
+        self.deque = deque(maxlen=10)
+        print("No issues!")
         return {}
 
     def step(self, data):
@@ -155,6 +163,11 @@ class TrailMarker(Module):
 
             ``return { ..., "galy": galy}``
         """
+        landmark_x = self.landmark_points[0]
+        landmark_y = self.landmark_points[1]
+        for point in self.landmarks:
+          self.deque.append(point)
+          
         return {}
 
     def stop(self, data):
@@ -178,3 +191,4 @@ class TrailMarker(Module):
             Letzte übergebene Daten des Frameworks.
         """
         pass
+    
