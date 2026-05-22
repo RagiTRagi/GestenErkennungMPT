@@ -130,6 +130,19 @@ class HandDetector(Module):
         dict
             Ein leeres Dictionary.
         """
+
+        model_path = get_nested_key(data, "config", "handdetector_model_path", default="hand_landmarker.task")
+
+        base_options = python.BaseOptions(model_asset_path=model_path)
+
+        options = vision.HandLandmarkerOptions(
+            base_options=base_options,
+            running_mode=vision.RunningMode.IMAGE,
+            num_hands=1
+        )
+
+        self.detector = vision.HandLandmarker.create_from_options(options)
+
         return {}
 
     def step(self, data):
@@ -184,6 +197,21 @@ class HandDetector(Module):
 
             ``return {outputSignal: result, "galy": galy}``
         """
+
+        webcam = data["webcam"]
+        if webcam is not None:
+
+            bild = cv2.cvtColor(webcam, cv2.COLOR_BGR2RGB)
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=bild)
+
+            result = self.detector.detect(mp_image)
+
+            galy = GALY()
+            if result.handedness:
+                for hand in result.handedness:
+                    draw_hand_landmarks(result.hand_landmarks[hand.index], galy)
+            return {"detector": result, "galy": galy}
+
         return {}
 
     def stop(self, data):
@@ -206,4 +234,5 @@ class HandDetector(Module):
         data : dict
             Letzte übergebene Daten des Frameworks.
         """
-        pass
+        if hasattr(self, 'detector'):
+            self.detector.close()

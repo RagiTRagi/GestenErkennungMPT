@@ -12,3 +12,6 @@ wheels/
 # Other
 data
 .training.py
+
+#Mediapipe
+.task
