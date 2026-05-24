@@ -1,5 +1,7 @@
 from SignalHub import Module, get_nested_key
 from collections import deque
+import numpy as np
+from SignalHub import GALY
 
 class TrailMarker(Module):
     """
@@ -101,12 +103,14 @@ class TrailMarker(Module):
             Ein leeres Dictionary.
         """
         self.landmark = data["detector"]
+        config = data["config"]
         #self.landmark_x = self.landmark_points[:, 0]
         #self.landmark_y = self.landmark_points[:, 1]
         print("Daten:", self.landmark)
         self.finger_index = 1 # Idee: landmark points werden von jedem finger getrackt und 
         # gesammelt -> mit slicing/indexing auf die zugehörigen Daten zugreifen
-        self.deque = deque(maxlen=10)
+        self.trajectory = deque(maxlen=10)
+        self.lost_frames = 0
         print("No issues!")
         return {}
 
@@ -163,10 +167,17 @@ class TrailMarker(Module):
 
             ``return { ..., "galy": galy}``
         """
-        landmark_x = self.landmark_points[0]
-        landmark_y = self.landmark_points[1]
-        for point in self.landmarks:
-          self.deque.append(point)
+        #landmark_x = self.landmark[0]
+        #landmark_y = self.landmark[1]
+        
+        if self.landmark == None:
+            self.lost_frames += 1
+            print(self.lost_frames)
+            return{}
+        print(self.lost_frames)
+         
+        
+        
           
         return {}
 
