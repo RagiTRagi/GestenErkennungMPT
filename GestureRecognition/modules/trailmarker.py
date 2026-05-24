@@ -102,16 +102,11 @@ class TrailMarker(Module):
         dict
             Ein leeres Dictionary.
         """
-        self.landmark = data["detector"]
-        config = data["config"]
-        #self.landmark_x = self.landmark_points[:, 0]
-        #self.landmark_y = self.landmark_points[:, 1]
-        print("Daten:", self.landmark)
-        self.finger_index = 1 # Idee: landmark points werden von jedem finger getrackt und 
-        # gesammelt -> mit slicing/indexing auf die zugehörigen Daten zugreifen
+        
+        config = data["config"]        
+        self.finger_index = 1 # Category(index=1, score=0.5351641178131104, display_name='Left', category_name='Left')]] so wird finger bestimmt
         self.trajectory = deque(maxlen=10)
         self.lost_frames = 0
-        print("No issues!")
         return {}
 
     def step(self, data):
@@ -167,18 +162,46 @@ class TrailMarker(Module):
 
             ``return { ..., "galy": galy}``
         """
-        #landmark_x = self.landmark[0]
-        #landmark_y = self.landmark[1]
-        
-        if self.landmark == None:
+
+        # TO-DO
+        # - Punktdaten korrekt zurücknormalisieren
+        # - dafür sorgen, dass bei lost frames die trajektorie bleibt
+        # - linien aufeinanderaufbauen lassen
+        # - 
+        # --------------------------------------
+        landmarks = data["detector"]
+        landmarks = landmarks.hand_landmarks # Landmarks pro Frame
+        #print("Ddaten:", landmark)
+        if len(landmarks) == 0:
             self.lost_frames += 1
             print(self.lost_frames)
-            return{}
-        print(self.lost_frames)
-         
+            return {}
         
+        galy = GALY()
+        galy.canvas("Trajectory", shape=(360, 640), color=(0, 0, 0))
+        for landmark in landmarks[0]:
+          pt = (landmark.x*640, landmark.y*360)
+          self.trajectory.append(pt)
+
+        #print(self.lost_frames)
+        #print("Landmarks:", landmarks)
+        #self.trajectory.appendleft(landmark)
         
+        for i in range(len(self.trajectory)-1):
+          if len(self.trajectory) <= 1:
+              continue
           
+          current_pt = self.trajectory[i]
+          next_pt = self.trajectory[i+1]
+          print("Points: ", (current_pt, next_pt))
+
+          
+          galy.line(current_pt, next_pt, (0, 102, 204), thickness=10)
+          return {"galy": galy}
+
+          # HandLandmarkerResult(handedness=[], hand_landmarks=[], hand_world_landmarks=[])
+          # Daten: HandLandmarkerResult(handedness=[], hand_landmarks=[], hand_world_landmarks=[])
+          #
         return {}
 
     def stop(self, data):
