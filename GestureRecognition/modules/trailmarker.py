@@ -103,10 +103,15 @@ class TrailMarker(Module):
             Ein leeres Dictionary.
         """
         
-        config = data["config"]        
-        self.finger_index = 1 # Category(index=1, score=0.5351641178131104, display_name='Left', category_name='Left')]] so wird finger bestimmt
-        self.trajectory = deque(maxlen=10)
+        config = data["config"]
+        self.W = get_nested_key("width", config["webcam"])
+        self.H = get_nested_key("height", config["webcam"]) 
+        self.galy = GALY()
+        self.galy.canvas("Trajectory", shape=(self.H, self.W), color=(0, 0, 0))
+        self.finger_index = 1 # Category(index=1, score=0.5351641178131104, display_name='Left', category_name='Left')]] so wird finger bestimmt ?
+        self.trajectory = deque(maxlen=100)
         self.lost_frames = 0
+        self.distance_threshold = (10, 10)
         return {}
 
     def step(self, data):
@@ -164,45 +169,52 @@ class TrailMarker(Module):
         """
 
         # TO-DO
-        # - Punktdaten korrekt zurücknormalisieren
-        # - dafür sorgen, dass bei lost frames die trajektorie bleibt
-        # - linien aufeinanderaufbauen lassen
-        # - 
+        # - Punktdaten korrekt zurücknormalisieren (semi geschafft)
+        # - dafür sorgen, dass bei lost frames die trajektorie zeichnung bleibt ✅
+        # - linien aufeinanderaufbauen lassen ✅
+        # - shape mit nested aus config extrahieren bezüglich frame größe
+        # - Finger Index Wahl 
         # --------------------------------------
+        
+        
         landmarks = data["detector"]
         landmarks = landmarks.hand_landmarks # Landmarks pro Frame
-        #print("Ddaten:", landmark)
+        #print("Ddaten:", landmarks)
         if len(landmarks) == 0:
             self.lost_frames += 1
-            print(self.lost_frames)
-            return {}
+            #print(self.lost_frames)
+            return {"galy": self.galy}
         
-        galy = GALY()
-        galy.canvas("Trajectory", shape=(360, 640), color=(0, 0, 0))
+        
         for landmark in landmarks[0]:
-          pt = (landmark.x*640, landmark.y*360)
+          ptn = (landmark.x, landmark.y)
+          pt = (np.float32(landmark.x*255), np.float32(landmark.y*255))
+          
           self.trajectory.append(pt)
 
         #print(self.lost_frames)
         #print("Landmarks:", landmarks)
-        #self.trajectory.appendleft(landmark)
         
         for i in range(len(self.trajectory)-1):
           if len(self.trajectory) <= 1:
-              continue
+            return {}
           
           current_pt = self.trajectory[i]
-          next_pt = self.trajectory[i+1]
-          print("Points: ", (current_pt, next_pt))
-
+          before_pt = self.trajectory[i-1]
+          d = np.sqrt((before_pt[0]-current_pt[0])**2 + (before_pt[1]))
+          #print("Points: ", (current_pt, next_pt))
+          if difference > self.distance_threshold:
+            print(difference)
+            return {}
           
-          galy.line(current_pt, next_pt, (0, 102, 204), thickness=10)
-          return {"galy": galy}
+          self.galy.circle(current_pt, 1, (0, 102, 204), thickness=2)
+        
+          return {"galy": self.galy}
 
           # HandLandmarkerResult(handedness=[], hand_landmarks=[], hand_world_landmarks=[])
           # Daten: HandLandmarkerResult(handedness=[], hand_landmarks=[], hand_world_landmarks=[])
           #
-        return {}
+        #return {}
 
     def stop(self, data):
         """
