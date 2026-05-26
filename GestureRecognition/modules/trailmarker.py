@@ -105,13 +105,14 @@ class TrailMarker(Module):
         
         config = data["config"]
         self.W = get_nested_key("width", config["webcam"])
-        self.H = get_nested_key("height", config["webcam"]) 
+        self.H = get_nested_key("height", config["webcam"])
+
         self.galy = GALY()
         self.galy.canvas("Trajectory", shape=(self.H, self.W), color=(0, 0, 0))
-        self.finger_index = 8 
+
+        self.finger_index = 8 # 8 = Index
         self.trajectory = deque(maxlen=10)
         self.lost_frames = 0
-        self.distance_threshold = 0.2
         return {}
 
     def step(self, data):
@@ -171,9 +172,9 @@ class TrailMarker(Module):
         # TO-DO
         # - dafür sorgen, dass bei lost frames die trajektorie zeichnung bleibt ✅
         # - linien aufeinanderaufbauen lassen ✅
-        # - 
+        # - noise reduzieren ✅ 
         # - shape mit nested aus config extrahieren bezüglich frame größe ✅
-        # - Finger Index Wahl 
+        # - Finger Index Wahl ✅
         # --------------------------------------
         
         
@@ -181,51 +182,31 @@ class TrailMarker(Module):
         #print("1",landmarks.hand_world_landmarks)
         landmarks = landmarks.hand_landmarks # Landmarks pro Frame
         
-        print("Ddaten:", landmarks)
+        #print("Ddaten:", landmarks)
         if len(landmarks) == 0:
           self.lost_frames += 1
           #print(self.lost_frames)
           return {"galy": self.galy}
         #print("2", landmarks[0][0])
-        finger_landmark = landmarks[0][self.finger_index]
-        pt = (finger_landmark.x*self.W, finger_landmark.y*self.H)
+
+        finger_landmark = landmarks[0][self.finger_index] # Landmarken des Fingers extrahieren
+        pt = (finger_landmark.x*self.H, finger_landmark.y*self.W)
         self.trajectory.append(pt)
+
         if len(self.trajectory) <=1:
           return {}
         #print(self.trajectory)
+
+        current_pt = self.trajectory[-2]
+        next_pt = self.trajectory[-1]
+
+        d = np.sqrt((current_pt[0]-next_pt[0])**2 + (current_pt[1]-next_pt[1])**2, dtype=np.float32)
+        #print(d)
+        if d >= 70.0:
+          return {"galy": self.galy}
+        
         self.galy.line(self.trajectory[-2], self.trajectory[-1], (0, 102, 204))
-        #before_lm = landmarks
-        #for i, landmark in enumerate(landmarks[0]):
-          #ptn = (landmark.x, landmark.y)
-        #  if before_lm == None:
-        #    continue
-          #print("1.", before_lm)
-        #  current_lm = landmark
-        #  d = np.sqrt((before_lm.x-current_lm.x)**2 + (before_lm.y-current_lm.y)**2, dtype=np.float32)
-        #  before_lm = landmark
-          #print("2.", before_lm)
-          #print(d)
-        #  if d > self.distance_threshold:
-        #    print(d)
-        #    continue
-
-        #  pt = (np.float32(landmark.x*self.W), np.float32(landmark.y*self.H))
-        #  self.trajectory.append(pt)
-          #print(self.trajectory)
-        
-        #for i in range(len(self.trajectory)-1):
-        #  if len(self.trajectory) <= 1:
-        #    continue
-        #  current_pt = self.trajectory[i]
-        #  next_pt = self.trajectory[i+1]
-          
-          #self.galy.circle(self.trajectory[i], 1, (0, 102, 204), thickness=2)
-        #  self.galy.line(current_pt, next_pt, (0, 102, 204))
-        
         return {"galy": self.galy}
-
-          # HandLandmarkerResult(handedness=[], hand_landmarks=[], hand_world_landmarks=[])
-          # Daten: HandLandmarkerResult(handedness=[], hand_landmarks=[], hand_world_landmarks=[])
 
     def stop(self, data):
         """
