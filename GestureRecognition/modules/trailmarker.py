@@ -169,15 +169,6 @@ class TrailMarker(Module):
             ``return { ..., "galy": galy}``
         """
 
-        # TO-DO
-        # - dafür sorgen, dass bei lost frames die trajektorie zeichnung bleibt ✅
-        # - linien aufeinanderaufbauen lassen ✅
-        # - noise reduzieren ✅ 
-        # - shape mit nested aus config extrahieren bezüglich frame größe ✅
-        # - Finger Index Wahl ✅
-        # --------------------------------------
-        
-        
         landmarks = data["detector"]
         #print("1",landmarks.hand_world_landmarks)
         landmarks = landmarks.hand_landmarks # Landmarks pro Frame
