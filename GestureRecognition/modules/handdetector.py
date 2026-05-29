@@ -9,7 +9,8 @@ from SignalHub import GALY, bgr, get_nested_key, Module
 mp_hand = mp.tasks.vision.HandLandmarksConnections
 
 
-def draw_hand_landmarks(hand_landmarks, galy: GALY):
+def draw_hand_landmarks(hand_landmarks, galy: GALY, img_size):
+    img_h, img_w = img_size
     lm = {
         "thumb":         {"color": bgr("#0000FF")},
         "index_finger":  {"color": bgr("#00FF00")},
@@ -23,17 +24,21 @@ def draw_hand_landmarks(hand_landmarks, galy: GALY):
     for key in lm.keys():
         pts = set()
         for conn in getattr(mp_hand, f"HAND_{key.upper()}_CONNECTIONS"):
-            start = (hand_landmarks[conn.start].x,
-                    hand_landmarks[conn.start].y)
-            end = (hand_landmarks[conn.end].x,
-                hand_landmarks[conn.end].y)
+            #print("Connect", conn)
+            start = (hand_landmarks[conn.start].x*img_h,
+                    hand_landmarks[conn.start].y*img_w)
+            #print("Start", start)
+            end = (hand_landmarks[conn.end].x*img_h,
+                hand_landmarks[conn.end].y*img_w)
+            #print("End", end)
             x = min(x, start[0], end[0])
             y = min(y, start[1], end[1])
             galy.line(start, end, lm[key]["color"], 2)
             pts.update([conn.start, conn.end])
+            #print(pts)
         for pt in pts:
-            galy.circle((hand_landmarks[pt].x, hand_landmarks[pt].y), 5, (255,255,255), 1)
-            galy.circle((hand_landmarks[pt].x, hand_landmarks[pt].y), 4, lm[key]["color"], -1)
+            galy.circle((hand_landmarks[pt].x * img_h, hand_landmarks[pt].y * img_w), 5, (255,255,255), 1)
+            galy.circle((hand_landmarks[pt].x * img_h, hand_landmarks[pt].y * img_w), 4, lm[key]["color"], -1)
 
 
 class HandDetector(Module):
@@ -205,17 +210,20 @@ class HandDetector(Module):
 
         webcam = data["webcam"]
         if webcam is not None:
-
+            h, w, _ = webcam.shape
+            
             bild = cv2.cvtColor(webcam, cv2.COLOR_BGR2RGB)
             mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=bild)
 
             result = self.detector.detect(mp_image)
 
             galy = GALY()
+            galy.canvas("hand landmarks", (h, w), (0, 0, 0), dtype=np.uint8)
 
             if result.handedness:
                 for hand_lms in result.hand_landmarks:
-                    draw_hand_landmarks(hand_lms, galy)
+                    #print(hand_lms)
+                    draw_hand_landmarks(hand_lms, galy, (h, w)) 
 
             return {"detector": result, "galy": galy}
 
