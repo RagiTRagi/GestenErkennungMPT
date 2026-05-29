@@ -220,5 +220,6 @@ class TrailMarker(Module):
         data : dict
             Letzte übergebene Daten des Frameworks.
         """
-        pass
+        print("last trajectory given")
+        return {"trailmarker": self.final_trajectory}
     
