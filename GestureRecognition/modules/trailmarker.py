@@ -113,6 +113,7 @@ class TrailMarker(Module):
         self.finger_index = 8 # 8 = Index
         self.trajectory = deque(maxlen=10)
         self.lost_frames = 0
+        self.final_trajectory = []
         return {}
 
     def step(self, data):
@@ -172,7 +173,7 @@ class TrailMarker(Module):
         landmarks = data["detector"]
         #print("1",landmarks.hand_world_landmarks)
         landmarks = landmarks.hand_landmarks # Landmarks pro Frame
-        
+        #galy = data["galy"]
         #print("Ddaten:", landmarks)
         if len(landmarks) == 0:
           self.lost_frames += 1
@@ -195,9 +196,9 @@ class TrailMarker(Module):
         #print(d)
         if d >= 70.0:
           return {"galy": self.galy}
-        
+        self.final_trajectory.append(current_pt)
         self.galy.line(self.trajectory[-2], self.trajectory[-1], (0, 102, 204))
-        return {"galy": self.galy}
+        return {"trailmarker":self.final_trajectory,"galy": self.galy}
 
     def stop(self, data):
         """

@@ -211,7 +211,7 @@ class HandDetector(Module):
         webcam = data["webcam"]
         if webcam is not None:
             h, w, _ = webcam.shape
-            
+
             bild = cv2.cvtColor(webcam, cv2.COLOR_BGR2RGB)
             mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=bild)
 
