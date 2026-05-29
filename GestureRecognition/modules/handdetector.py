@@ -9,7 +9,7 @@ from SignalHub import GALY, bgr, get_nested_key, Module
 mp_hand = mp.tasks.vision.HandLandmarksConnections
 
 
-def draw_hand_landmarks(hand_landmarks, galy: GALY):
+def draw_hand_landmarks(hand_landmarks, galy: GALY, w, h):
     lm = {
         "thumb":         {"color": bgr("#0000FF")},
         "index_finger":  {"color": bgr("#00FF00")},
@@ -23,17 +23,18 @@ def draw_hand_landmarks(hand_landmarks, galy: GALY):
     for key in lm.keys():
         pts = set()
         for conn in getattr(mp_hand, f"HAND_{key.upper()}_CONNECTIONS"):
-            start = (hand_landmarks[conn.start].x,
-                    hand_landmarks[conn.start].y)
-            end = (hand_landmarks[conn.end].x,
-                hand_landmarks[conn.end].y)
+            start = (int(hand_landmarks[conn.start].x * w), 
+                    int(hand_landmarks[conn.start].y * h))
+
+            end = (int(hand_landmarks[conn.end].x * w), 
+                int(hand_landmarks[conn.end].y * h))
             x = min(x, start[0], end[0])
             y = min(y, start[1], end[1])
             galy.line(start, end, lm[key]["color"], 2)
             pts.update([conn.start, conn.end])
         for pt in pts:
-            galy.circle((hand_landmarks[pt].x, hand_landmarks[pt].y), 5, (255,255,255), 1)
-            galy.circle((hand_landmarks[pt].x, hand_landmarks[pt].y), 4, lm[key]["color"], -1)
+            galy.circle((int(hand_landmarks[pt].x * w), int(hand_landmarks[pt].y * h)), 5, (255,255,255), 1)
+            galy.circle((int(hand_landmarks[pt].x * w), int(hand_landmarks[pt].y * h)), 4, lm[key]["color"], -1)
 
 
 class HandDetector(Module):
@@ -205,7 +206,7 @@ class HandDetector(Module):
 
         webcam = data["webcam"]
         if webcam is not None:
-
+            h, w, _ = webcam.shape
             bild = cv2.cvtColor(webcam, cv2.COLOR_BGR2RGB)
             mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=bild)
 
@@ -213,9 +214,9 @@ class HandDetector(Module):
 
             galy = GALY()
 
-            if result.handedness:
+            if result.hand_landmarks:
                 for hand_lms in result.hand_landmarks:
-                    draw_hand_landmarks(hand_lms, galy)
+                    draw_hand_landmarks(hand_lms, galy, w, h)
 
             return {"detector": result, "galy": galy}
 
