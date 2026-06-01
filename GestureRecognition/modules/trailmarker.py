@@ -1,4 +1,4 @@
-from SignalHub import Module, get_nested_key
+from SignalHub import Module, bgr, get_nested_key
 from collections import deque
 import numpy as np
 from SignalHub import GALY
@@ -107,14 +107,16 @@ class TrailMarker(Module):
         self.W = get_nested_key("width", config["webcam"])
         self.H = get_nested_key("height", config["webcam"])
 
-        self.galy = GALY()
-        # GALY.canvas expects (width, height)
-        self.galy.canvas("Trajectory", shape=(self.W, self.H), color=(0, 0, 0))
-
         self.finger_index = 8 # 8 = Index
         self.trajectory = deque(maxlen=10)
         self.lost_frames = 0
         self.final_trajectory = []
+        # persistente Speicherung von gezeichneten Strokes (Liste von Punktlisten)
+        self.strokes = []
+        # aktuell geführter Stroke (wird fortlaufend befüllt)
+        self.current_stroke = []
+        # Anzahl Frames, nach denen ein Stroke als beendet gilt
+        self.stroke_finish_threshold = 3
         return {}
 
     def step(self, data):
@@ -171,54 +173,62 @@ class TrailMarker(Module):
             ``return { ..., "galy": galy}``
         """
 
-        det = data.get("detector")
-        if det is None or not hasattr(det, 'hand_landmarks') or det.hand_landmarks is None:
-          self.lost_frames += 1
-          return {"galy": self.galy}
-
-        landmarks = det.hand_landmarks  # Landmarks pro Frame
+        galy = GALY()
+        landmarks = data["detector"]
+        #print("1",landmarks.hand_world_landmarks)
+        landmarks = landmarks.hand_landmarks # Landmarks pro Frame
+        #galy = data["galy"]
+        #print("Ddaten:", landmarks)
         if len(landmarks) == 0:
+          # keine Hand erkannt: erhöhten lost counter
           self.lost_frames += 1
-          return {"galy": self.galy}
+          # falls ein aktueller Stroke existiert und wir ihn beenden sollten,
+          # verschiebe ihn in die persistenten Strokes
+          if self.current_stroke and self.lost_frames >= self.stroke_finish_threshold:
+              self.strokes.append(self.current_stroke[:])
+              self.current_stroke.clear()
+          # redraw all stored strokes so the drawing persists
+          for stroke in self.strokes:
+              for i in range(1, len(stroke)):
+                  galy.line(stroke[i-1], stroke[i], (0, 0, 0))
+          for i in range(1, len(self.current_stroke)):
+              galy.line(self.current_stroke[i-1], self.current_stroke[i], (0, 0, 0))
+          return {"galy": galy}
         #print("2", landmarks[0][0])
 
-        try:
-          finger_landmark = landmarks[0][self.finger_index]  # Landmarken des Fingers extrahieren
-        except Exception:
-          self.lost_frames += 1
-          return {"galy": self.galy}
+        # Hand erkannt -> reset lost counter
+        self.lost_frames = 0
 
-        x = float(finger_landmark.x)
-        y = float(finger_landmark.y)
-        if not np.isfinite(x) or not np.isfinite(y):
-          self.lost_frames += 1
-          return {"galy": self.galy}
+        finger_landmark = landmarks[0][self.finger_index] # Landmarken des Fingers extrahieren
+        pt = (finger_landmark.x * self.W, finger_landmark.y * self.H)
 
-        px = int(np.clip(x * self.W, 0, self.W - 1))
-        py = int(np.clip(y * self.H, 0, self.H - 1))
-        pt = (px, py)
+        # füge Punkt in die kurzfristige Trajektorie und in den aktuellen Stroke
         self.trajectory.append(pt)
+        # wenn current_stroke leer, starte neuen Stroke
+        if not self.current_stroke:
+          self.current_stroke.append(pt)
+        else:
+          # Abstand zur letzten Position
+          last = self.current_stroke[-1]
+          d = float(np.hypot(last[0]-pt[0], last[1]-pt[1]))
+          if d >= 70.0:
+            # großer Sprung: beende aktuellen Stroke und starte neuen
+            self.strokes.append(self.current_stroke[:])
+            self.current_stroke = [pt]
+          else:
+            self.current_stroke.append(pt)
 
-        if len(self.trajectory) <= 1:
-          # draw a small dot for the initial point so canvas is not empty
-          if len(self.trajectory) == 1:
-            self.galy.circle(self.trajectory[-1], 3, (0, 102, 204), -1)
-          return {"galy": self.galy}
-        #print(self.trajectory)
+        # zeichne alle persistente Strokes neu (so bleiben sie sichtbar)
+        for stroke in self.strokes:
+          for i in range(1, len(stroke)):
+            galy.line(stroke[i-1], stroke[i], (bgr("#FFE600")))
+        # zeichne aktuellen Stroke
+        for i in range(1, len(self.current_stroke)):
+          galy.line(self.current_stroke[i-1], self.current_stroke[i], (bgr("#FFE600")))
 
-        current_pt = self.trajectory[-2]
-        next_pt = self.trajectory[-1]
-
-        d = np.sqrt((current_pt[0]-next_pt[0])**2 + (current_pt[1]-next_pt[1])**2, dtype=np.float32)
-        # ignore very large jumps (likely detection glitches)
-        if d >= 200.0:
-          return {"galy": self.galy}
-        # ignore very small movements below drawing threshold
-        if d < 2.0:
-          return {"galy": self.galy}
-        self.final_trajectory.append(current_pt)
-        self.galy.line(self.trajectory[-2], self.trajectory[-1], (0, 102, 204))
-        return {"trailmarker":self.final_trajectory,"galy": self.galy}
+        # optional: liefere komplette Sammlung zurück
+        all_strokes = self.strokes + ([self.current_stroke] if self.current_stroke else [])
+        return {"trailmarker": all_strokes, "galy": galy}
 
     def stop(self, data):
         """
@@ -240,5 +250,6 @@ class TrailMarker(Module):
         data : dict
             Letzte übergebene Daten des Frameworks.
         """
-        pass
+        print("last trajectory given")
+        return {"trailmarker": self.final_trajectory}
     
