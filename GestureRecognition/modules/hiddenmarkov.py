@@ -187,10 +187,9 @@ class HMMModule(Module):
         best_label = max(scores, key=scores.get)
 
         galy = GALY()
-        galy.canvas("Scores")
         galy.putText(f"{best_label}: {scores[best_label]}")
 
-        return {self.outputSignal: {best_label, "galy": galy}}
+        return {self.outputSignal: best_label, "galy": galy}
 
     def stop(self, data):
         """
