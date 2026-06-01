@@ -108,7 +108,8 @@ class TrailMarker(Module):
         self.H = get_nested_key("height", config["webcam"])
 
         self.galy = GALY()
-        self.galy.canvas("Trajectory", shape=(self.H, self.W), color=(0, 0, 0))
+        # GALY.canvas expects (width, height)
+        self.galy.canvas("Trajectory", shape=(self.W, self.H), color=(0, 0, 0))
 
         self.finger_index = 8 # 8 = Index
         self.trajectory = deque(maxlen=10)
@@ -170,31 +171,50 @@ class TrailMarker(Module):
             ``return { ..., "galy": galy}``
         """
 
-        landmarks = data["detector"]
-        #print("1",landmarks.hand_world_landmarks)
-        landmarks = landmarks.hand_landmarks # Landmarks pro Frame
-        #galy = data["galy"]
-        #print("Ddaten:", landmarks)
+        det = data.get("detector")
+        if det is None or not hasattr(det, 'hand_landmarks') or det.hand_landmarks is None:
+          self.lost_frames += 1
+          return {"galy": self.galy}
+
+        landmarks = det.hand_landmarks  # Landmarks pro Frame
         if len(landmarks) == 0:
           self.lost_frames += 1
-          #print(self.lost_frames)
           return {"galy": self.galy}
         #print("2", landmarks[0][0])
 
-        finger_landmark = landmarks[0][self.finger_index] # Landmarken des Fingers extrahieren
-        pt = (finger_landmark.x*self.H, finger_landmark.y*self.W)
+        try:
+          finger_landmark = landmarks[0][self.finger_index]  # Landmarken des Fingers extrahieren
+        except Exception:
+          self.lost_frames += 1
+          return {"galy": self.galy}
+
+        x = float(finger_landmark.x)
+        y = float(finger_landmark.y)
+        if not np.isfinite(x) or not np.isfinite(y):
+          self.lost_frames += 1
+          return {"galy": self.galy}
+
+        px = int(np.clip(x * self.W, 0, self.W - 1))
+        py = int(np.clip(y * self.H, 0, self.H - 1))
+        pt = (px, py)
         self.trajectory.append(pt)
 
-        if len(self.trajectory) <=1:
-          return {}
+        if len(self.trajectory) <= 1:
+          # draw a small dot for the initial point so canvas is not empty
+          if len(self.trajectory) == 1:
+            self.galy.circle(self.trajectory[-1], 3, (0, 102, 204), -1)
+          return {"galy": self.galy}
         #print(self.trajectory)
 
         current_pt = self.trajectory[-2]
         next_pt = self.trajectory[-1]
 
         d = np.sqrt((current_pt[0]-next_pt[0])**2 + (current_pt[1]-next_pt[1])**2, dtype=np.float32)
-        #print(d)
-        if d >= 70.0:
+        # ignore very large jumps (likely detection glitches)
+        if d >= 200.0:
+          return {"galy": self.galy}
+        # ignore very small movements below drawing threshold
+        if d < 2.0:
           return {"galy": self.galy}
         self.final_trajectory.append(current_pt)
         self.galy.line(self.trajectory[-2], self.trajectory[-1], (0, 102, 204))

@@ -24,21 +24,17 @@ def draw_hand_landmarks(hand_landmarks, galy: GALY, img_size):
     for key in lm.keys():
         pts = set()
         for conn in getattr(mp_hand, f"HAND_{key.upper()}_CONNECTIONS"):
-            #print("Connect", conn)
-            start = (hand_landmarks[conn.start].x*img_h,
-                    hand_landmarks[conn.start].y*img_w)
-            #print("Start", start)
-            end = (hand_landmarks[conn.end].x*img_h,
-                hand_landmarks[conn.end].y*img_w)
-            #print("End", end)
+            start = (hand_landmarks[conn.start].x * img_w,
+                     hand_landmarks[conn.start].y * img_h)
+            end = (hand_landmarks[conn.end].x * img_w,
+                   hand_landmarks[conn.end].y * img_h)
             x = min(x, start[0], end[0])
             y = min(y, start[1], end[1])
             galy.line(start, end, lm[key]["color"], 2)
             pts.update([conn.start, conn.end])
-            #print(pts)
         for pt in pts:
-            galy.circle((hand_landmarks[pt].x * img_h, hand_landmarks[pt].y * img_w), 5, (255,255,255), 1)
-            galy.circle((hand_landmarks[pt].x * img_h, hand_landmarks[pt].y * img_w), 4, lm[key]["color"], -1)
+            galy.circle((hand_landmarks[pt].x * img_w, hand_landmarks[pt].y * img_h), 5, (255,255,255), 1)
+            galy.circle((hand_landmarks[pt].x * img_w, hand_landmarks[pt].y * img_h), 4, lm[key]["color"], -1)
 
 
 class HandDetector(Module):
@@ -217,15 +213,7 @@ class HandDetector(Module):
 
             result = self.detector.detect(mp_image)
 
-            galy = GALY()
-            galy.canvas("hand landmarks", (h, w), (0, 0, 0), dtype=np.uint8)
-
-            if result.handedness:
-                for hand_lms in result.hand_landmarks:
-                    #print(hand_lms)
-                    draw_hand_landmarks(hand_lms, galy, (h, w)) 
-
-            return {"detector": result, "galy": galy}
+            return {"detector": result}
 
         return {}
 
