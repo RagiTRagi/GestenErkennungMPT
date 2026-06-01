@@ -1,3 +1,4 @@
+import pickle
 from SignalHub import GALY, bgr, get_nested_key, Module
 
 
@@ -70,6 +71,9 @@ class HMMModule(Module):
             name="hiddenmarkov",
         )
 
+        self.outputSignal = outputSignal
+        self.model_path = model_path
+
     def start(self, data):
         """
         Initialisierung des Moduls.
@@ -107,6 +111,8 @@ class HMMModule(Module):
         dict
             Ein leeres Dictionary.
         """
+        with open(self.model_path, "rb") as file:
+            self.model = pickle.load(file)
         return {}
 
     def step(self, data):
@@ -169,7 +175,21 @@ class HMMModule(Module):
 
             ``return {outputSignal: result, "galy": galy}``
         """
-        return {}
+        
+        trajectory = data["preprocessor"]
+
+        if trajectory is None:
+            return {}
+        
+        scores = {}
+        for label, hmm in self.model.items():
+            scores[label] = hmm.score(trajectory)
+        best_label = max(scores, key=scores.get)
+
+        galy = GALY()
+        galy.putText(f"{best_label}: {scores[best_label]}")
+
+        return {self.outputSignal: best_label, "galy": galy}
 
     def stop(self, data):
         """
