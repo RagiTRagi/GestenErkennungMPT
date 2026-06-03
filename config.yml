@@ -9,7 +9,7 @@ recorder:
     - hiddenmarkov
     - detector
 webcam:
-  deviceIndex: 2
+  deviceIndex: 0
   width: 640
   height: 360
   dtype: u8
