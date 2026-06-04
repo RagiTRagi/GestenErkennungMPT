@@ -188,19 +188,15 @@ class TrailMarker(Module):
 
         
         if landmarks is None or len(landmarks) == 0:
-          #print("lost")
-          print(self.lost_frames)
           self.lost_frames += 1
 
           if self.lost_frames >= self.max_lostframe:
             self.final_trajectory.clear()
             self.trajectory.clear()
-            print("lost frame is too much")
             self.lost_frames = 0
             return {"galy": galy}
           
           self.draw_trajectory(galy)
-          #self.lost_frames = 0
           return {"galy": galy}
         
         self.lost_frames = 0
@@ -208,38 +204,33 @@ class TrailMarker(Module):
         finger_landmark = landmarks[0][self.finger_index] # Landmarken des Fingers extrahieren
         pip = landmarks[0][self.finger_index-2]
         extended_finger = finger_landmark.y < pip.y
+
         if not extended_finger:
            self.draw_trajectory(galy)
            return {"galy": galy}
+        
         px = np.clip(finger_landmark.x*self.W, 0, self.W-1)
         py = np.clip(finger_landmark.y*self.H, 0, self.H-1)
         pt = (px, py)
-        
         self.trajectory.append(pt)
 
         print(self.final_trajectory)
         if len(self.trajectory) == 1:
           self.final_trajectory.append(self.trajectory[0])
           return {"galy": galy}
-        # print(self.trajectory)
 
         previous_pt = self.trajectory[-2]
         current_pt = self.trajectory[-1]
 
         d = np.sqrt((previous_pt[0]-current_pt[0])**2 + (previous_pt[1]-current_pt[1])**2)
-        print(d)
+
         if d >= 60.0 or d < 1.0:
           self.trajectory.pop()
           self.draw_trajectory(galy)
           return {"galy": galy}
         
         self.final_trajectory.append(current_pt)
-
-        
         self.draw_trajectory(galy)
-          
-
-        #galy.line(self.trajectory[-2], self.trajectory[-1], (0, 102, 204))
         return {"trailmarker":self.final_trajectory,"galy": galy}
 
     def stop(self, data):
