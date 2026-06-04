@@ -112,12 +112,21 @@ class TrailMarker(Module):
         #self.galy.canvas("Trajectory", shape=(self.H, self.W), color=(0, 0, 0))
 
         self.finger_index = 8 # 8 = Index
-        self.trajectory = deque(maxlen=200)
+        self.trajectory = deque(maxlen=2)
         self.lost_frames = 0
-        self.final_trajectory = []
-        self.max_lostframe = 20
+        self.final_trajectory = deque(maxlen=250)
+        self.max_lostframe = 30
         #self.key = cv2.waitKey(1)
         return {}
+    
+    def draw_trajectory(self, galy):
+       for i in range(len(self.final_trajectory)):
+            if i == 0:
+              continue
+            curr_pt = self.final_trajectory[i]
+            prev_pt = self.final_trajectory[i-1]
+            galy.line(curr_pt, prev_pt, (64, 224, 208))
+       
 
     def step(self, data):
         """
@@ -176,58 +185,62 @@ class TrailMarker(Module):
         detector = data["detector"]
         landmarks = detector.hand_landmarks # Landmarks pro Frame
         print(self.lost_frames)
+
         
-        if self.lost_frames >= self.max_lostframe:
-            #self.lost_frames = 0
-            #self.trajectory.clear()
-            self.final_trajectory.clear()
-            print("lost frame is too much")
-            self.lost_frames = 0
-            return {"galy": galy}
         if landmarks is None or len(landmarks) == 0:
           #print("lost")
           print(self.lost_frames)
           self.lost_frames += 1
-          for i in range(len(self.final_trajectory)):
-            if i == 0:
-              continue
-            curr_pt = self.final_trajectory[i]
-            prev_pt = self.final_trajectory[i-1]
-            galy.line(curr_pt, prev_pt, (0, 62, 254))
+
+          if self.lost_frames >= self.max_lostframe:
+            self.final_trajectory.clear()
+            self.trajectory.clear()
+            print("lost frame is too much")
+            self.lost_frames = 0
+            return {"galy": galy}
+          
+          self.draw_trajectory(galy)
           #self.lost_frames = 0
           return {"galy": galy}
-          
         
-      
-        #print("2", landmarks[0][0])
+        self.lost_frames = 0
 
         finger_landmark = landmarks[0][self.finger_index] # Landmarken des Fingers extrahieren
+        pip = landmarks[0][self.finger_index-2]
+        extended_finger = finger_landmark.y < pip.y
+        if not extended_finger:
+           self.draw_trajectory(galy)
+           return {"galy": galy}
         px = np.clip(finger_landmark.x*self.W, 0, self.W-1)
         py = np.clip(finger_landmark.y*self.H, 0, self.H-1)
         pt = (px, py)
+        
         self.trajectory.append(pt)
 
-        if len(self.trajectory) <= 1:
-          return {}
+        print(self.final_trajectory)
+        if len(self.trajectory) == 1:
+          self.final_trajectory.append(self.trajectory[0])
+          return {"galy": galy}
         # print(self.trajectory)
 
-        current_pt = self.trajectory[-2]
-        next_pt = self.trajectory[-1]
+        previous_pt = self.trajectory[-2]
+        current_pt = self.trajectory[-1]
 
-        d = np.sqrt((current_pt[0]-next_pt[0])**2 + (current_pt[1]-next_pt[1])**2, dtype=np.float32)
-        # print(d)
-        if d >= 70.0:
+        d = np.sqrt((previous_pt[0]-current_pt[0])**2 + (previous_pt[1]-current_pt[1])**2)
+        print(d)
+        if d >= 60.0 or d < 1.0:
+          self.trajectory.pop()
+          self.draw_trajectory(galy)
           return {"galy": galy}
+        
         self.final_trajectory.append(current_pt)
-        for i in range(len(self.final_trajectory)):
-          if i == 0:
-            continue
-          curr_pt = self.final_trajectory[i]
-          prev_pt = self.final_trajectory[i-1]
-          galy.line(curr_pt, prev_pt, (0, 62, 254))
+
+        
+        self.draw_trajectory(galy)
+          
 
         #galy.line(self.trajectory[-2], self.trajectory[-1], (0, 102, 204))
-        return {"trailmarker":self.trajectory,"galy": galy}
+        return {"trailmarker":self.final_trajectory,"galy": galy}
 
     def stop(self, data):
         """
@@ -249,6 +262,5 @@ class TrailMarker(Module):
         data : dict
             Letzte übergebene Daten des Frameworks.
         """
-        print("last trajectory given")
         return {"trailmarker": self.final_trajectory}
     
