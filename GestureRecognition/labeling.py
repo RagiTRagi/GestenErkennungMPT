@@ -1,3 +1,7 @@
+import os
+import sys
+from GestureRecognition.modules import HandDetector, TrailMarker, Preprocessor
+
 def data_labeling(times: int, label: str):
     """
     TODO: data_labeling: Datenerfassung für Gesten (SignalHub)
@@ -71,9 +75,31 @@ def data_labeling(times: int, label: str):
         Name der Geste / Klasse.
         Kann ebenfalls frei gestaltet werden (z. B. dynamische Labels, mehrere Klassen gleichzeitig).
     """
-    pass
+    labeling_subprocess = [
+       HandDetector(),
+       TrailMarker(),
+       Preprocessor(),
+    ]
+   
+    
+    
+    cwd = os.getcwd()
+    data_dir = os.path.dirname(os.path.join("..", cwd))
+    folder = "recordings"
+    data_path = os.path.join(data_dir, folder)
+    items = os.listdir(data_path)
+    
+    try:
+      new_dir = os.path.join(data_path, label.title())
+      os.mkdir(new_dir)
+    except FileExistsError:
+      print("Directory already exists.")
 
+    
+    
+    return items
 
+print(data_labeling(2, "m"))
 
 
 def dataset_building(output_path):
