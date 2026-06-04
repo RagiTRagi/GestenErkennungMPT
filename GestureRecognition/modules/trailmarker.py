@@ -2,6 +2,7 @@ from SignalHub import Module, get_nested_key
 from collections import deque
 import numpy as np
 from SignalHub import GALY
+import cv2
 
 class TrailMarker(Module):
     """
@@ -107,13 +108,15 @@ class TrailMarker(Module):
         self.W = get_nested_key("width", config["webcam"])
         self.H = get_nested_key("height", config["webcam"])
 
-        self.galy = GALY()
-        self.galy.canvas("Trajectory", shape=(self.H, self.W), color=(0, 0, 0))
+        #self.galy = GALY()
+        #self.galy.canvas("Trajectory", shape=(self.H, self.W), color=(0, 0, 0))
 
         self.finger_index = 8 # 8 = Index
-        self.trajectory = deque(maxlen=10)
+        self.trajectory = deque(maxlen=200)
         self.lost_frames = 0
         self.final_trajectory = []
+        self.max_lostframe = 20
+        #self.key = cv2.waitKey(1)
         return {}
 
     def step(self, data):
@@ -169,36 +172,62 @@ class TrailMarker(Module):
 
             ``return { ..., "galy": galy}``
         """
-
-        landmarks = data["detector"]
-        #print("1",landmarks.hand_world_landmarks)
-        landmarks = landmarks.hand_landmarks # Landmarks pro Frame
-        #galy = data["galy"]
-        #print("Ddaten:", landmarks)
-        if len(landmarks) == 0:
+        galy = GALY()
+        detector = data["detector"]
+        landmarks = detector.hand_landmarks # Landmarks pro Frame
+        print(self.lost_frames)
+        
+        if self.lost_frames >= self.max_lostframe:
+            #self.lost_frames = 0
+            #self.trajectory.clear()
+            self.final_trajectory.clear()
+            print("lost frame is too much")
+            self.lost_frames = 0
+            return {"galy": galy}
+        if landmarks is None or len(landmarks) == 0:
+          #print("lost")
+          print(self.lost_frames)
           self.lost_frames += 1
-          #print(self.lost_frames)
-          return {"galy": self.galy}
+          for i in range(len(self.final_trajectory)):
+            if i == 0:
+              continue
+            curr_pt = self.final_trajectory[i]
+            prev_pt = self.final_trajectory[i-1]
+            galy.line(curr_pt, prev_pt, (0, 62, 254))
+          #self.lost_frames = 0
+          return {"galy": galy}
+          
+        
+      
         #print("2", landmarks[0][0])
 
         finger_landmark = landmarks[0][self.finger_index] # Landmarken des Fingers extrahieren
-        pt = (finger_landmark.x*self.H, finger_landmark.y*self.W)
+        px = np.clip(finger_landmark.x*self.W, 0, self.W-1)
+        py = np.clip(finger_landmark.y*self.H, 0, self.H-1)
+        pt = (px, py)
         self.trajectory.append(pt)
 
-        if len(self.trajectory) <=1:
+        if len(self.trajectory) <= 1:
           return {}
-        #print(self.trajectory)
+        # print(self.trajectory)
 
         current_pt = self.trajectory[-2]
         next_pt = self.trajectory[-1]
 
         d = np.sqrt((current_pt[0]-next_pt[0])**2 + (current_pt[1]-next_pt[1])**2, dtype=np.float32)
-        #print(d)
+        # print(d)
         if d >= 70.0:
-          return {"galy": self.galy}
+          return {"galy": galy}
         self.final_trajectory.append(current_pt)
-        self.galy.line(self.trajectory[-2], self.trajectory[-1], (0, 102, 204))
-        return {"trailmarker":self.final_trajectory,"galy": self.galy}
+        for i in range(len(self.final_trajectory)):
+          if i == 0:
+            continue
+          curr_pt = self.final_trajectory[i]
+          prev_pt = self.final_trajectory[i-1]
+          galy.line(curr_pt, prev_pt, (0, 62, 254))
+
+        #galy.line(self.trajectory[-2], self.trajectory[-1], (0, 102, 204))
+        return {"trailmarker":self.trajectory,"galy": galy}
 
     def stop(self, data):
         """
