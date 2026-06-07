@@ -1,6 +1,6 @@
 engine:
   speed: 4
-  autoclose: False
+  autoclose: True
 recorder:
   file: record/test.pickle
   replay:

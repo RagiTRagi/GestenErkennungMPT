@@ -1,103 +1,132 @@
 import os
-import sys
-from GestureRecognition.modules import HandDetector, TrailMarker, Preprocessor
+import msvcrt
+from argparse import ArgumentParser
+from SignalHub.configparser import ConfigParser
+from SignalHub.engine import Engine
+from SignalHub.webcam import Webcam
+from modules import *
+from SignalHub.galyQT import qt_quit
 
 def data_labeling(times: int, label: str):
-    """
-    TODO: data_labeling: Datenerfassung für Gesten (SignalHub)
+   """
+   TODO: data_labeling: Datenerfassung für Gesten (SignalHub)
 
-    Ziel:
-    -----
-    Implementiere eine Funktion, mit der Trainingsdaten für eine bestimmte
-    Geste aufgenommen und gespeichert werden können.
+   Ziel:
+   -----
+   Implementiere eine Funktion, mit der Trainingsdaten für eine bestimmte
+   Geste aufgenommen und gespeichert werden können.
 
-    Anforderungen / Ideen:
-    ----------------------
+   Anforderungen / Ideen:
+   ----------------------
 
-    1. Aufnahme starten
+   1. Aufnahme starten
 
-       - Starte SignalHub über einen Subprocess
-       - Übergib einen Dateipfad für die Aufnahme
-       - Überlege, welche Module aufgenommen werden sollen
-       - Nimm entsprechende Änderungen in der ``config.yaml`` vor
+      - Starte SignalHub über einen Subprocess
+      - Übergib einen Dateipfad für die Aufnahme
+      - Überlege, welche Module aufgenommen werden sollen
+      - Nimm entsprechende Änderungen in der ``config.yaml`` vor
 
-    2. Interaktive Steuerung (optional)
+   2. Interaktive Steuerung (optional)
 
-       - Implementiere eine einfache Benutzerinteraktion:
-         - Aufnahme speichern
-         - Aufnahme verwerfen
-         - Programm beenden
+      - Implementiere eine einfache Benutzerinteraktion:
+      - Aufnahme speichern
+      - Aufnahme verwerfen
+      - Programm beenden
 
-    .. tip::
+   .. tip::
 
-       Die Funktion ``getch()`` (Aus dem Modul Linux :mod:`getch` oder bei Windows :mod:`msvcrt`) ist sehr hilfreich, um einzelne Tastendrücke
-       direkt auszulesen (ohne Enter). Damit kannst du dir ein schnelles
-       Labeling-Interface bauen.
+      Die Funktion ``getch()`` (Aus dem Modul Linux :mod:`getch` oder bei Windows :mod:`msvcrt`) ist sehr hilfreich, um einzelne Tastendrücke
+      direkt auszulesen (ohne Enter). Damit kannst du dir ein schnelles
+      Labeling-Interface bauen.
 
-       Beispiel:
+      Beispiel:
 
-       .. code-block:: text
+      .. code-block:: text
 
-           ESC → speichern
-           andere Taste → verwerfen
+         ESC → speichern
+         andere Taste → verwerfen
 
-    3. Daten sichten und bereinigen
+   3. Daten sichten und bereinigen
 
-       - Lade die aufgenommenen Daten
-       - Überlege:
-         - Welche Teile sind relevant?
-         - Welche Frames sind leer oder unbrauchbar?
-         - Sollten gewisse Sequenzen evtl. gar nicht benutzt werden?
-       - Entferne unnötige Anteile (z. B. keine erkannte Hand am Anfang/Ende)
+      - Lade die aufgenommenen Daten
+      - Überlege:
+      - Welche Teile sind relevant?
+      - Welche Frames sind leer oder unbrauchbar?
+      - Sollten gewisse Sequenzen evtl. gar nicht benutzt werden?
+      - Entferne unnötige Anteile (z. B. keine erkannte Hand am Anfang/Ende)
 
-    4. Speicherung
+   4. Speicherung
 
-       - Speichere Daten strukturiert nach Labels (z. B. Ordnerstruktur)
-       - Jede Aufnahme sollte einzeln gespeichert werden
+      - Speichere Daten strukturiert nach Labels (z. B. Ordnerstruktur)
+      - Jede Aufnahme sollte einzeln gespeichert werden
 
-    .. note::
+   .. note::
 
-       Die konkrete Umsetzung (Dateiformat, Struktur, Ablauf) ist bewusst offen.
-       Entwickle ein System, das für dich sinnvoll ist und sich gut weiterverarbeiten lässt.
+      Die konkrete Umsetzung (Dateiformat, Struktur, Ablauf) ist bewusst offen.
+      Entwickle ein System, das für dich sinnvoll ist und sich gut weiterverarbeiten lässt.
 
-    .. warning::
+   .. warning::
 
-       Ziel ist nicht nur, dass es „funktioniert“, sondern ein sauberer und
-       effizienter Workflow für Datensammlung.
+      Ziel ist nicht nur, dass es „funktioniert“, sondern ein sauberer und
+      effizienter Workflow für Datensammlung.
 
-    Parameters
-    ----------
-    times : int
-        Wie viele Aufnahmen gemacht werden sollen.
-        Kann frei angepasst werden (z. B. Endlosschleife oder interaktive Steuerung).
+   Parameters
+   ----------
+   times : int
+      Wie viele Aufnahmen gemacht werden sollen.
+      Kann frei angepasst werden (z. B. Endlosschleife oder interaktive Steuerung).
 
-    label : str
-        Name der Geste / Klasse.
-        Kann ebenfalls frei gestaltet werden (z. B. dynamische Labels, mehrere Klassen gleichzeitig).
-    """
-    labeling_subprocess = [
-       HandDetector(),
-       TrailMarker(),
-       Preprocessor(),
-    ]
+   label : str
+      Name der Geste / Klasse.
+      Kann ebenfalls frei gestaltet werden (z. B. dynamische Labels, mehrere Klassen gleichzeitig).
+   """
    
+   if msvcrt.getch() == b' ':
+      print("Recording starts..")
+
+      modules = [
+      #ConfigParser(parser),
+      Webcam(),
+      HandDetector(),
+      TrailMarker(),
+      Preprocessor(),
+      HMMModule(),
+      ]
+
+      parser = ArgumentParser("GestureRecognition")
+      parser.add_argument("--mode", action="store")
+      parser.set_defaults(mode="record")
+      config = ConfigParser(parser)
+      data = config.start({"recorder": "replay"})
+      engine = Engine(modules= modules, signals={})
+      engine.run(data)
+
+      print("Replay starts..")
+      parser2 = ArgumentParser("GestureRecognition")
+      parser2.set_defaults(mode="replay")
+      config2 = ConfigParser(parser2)
+      replay_data = config2.start({"recorder": "replay"})
+      print("Replay", replay_data)
+      engine = Engine(modules= modules, signals={})
+      engine.run(replay_data)
+      print("successful")
     
-    
-    cwd = os.getcwd()
-    data_dir = os.path.dirname(os.path.join("..", cwd))
-    folder = "recordings"
-    data_path = os.path.join(data_dir, folder)
-    items = os.listdir(data_path)
-    
-    try:
+   cwd = os.getcwd()
+   data_dir = os.path.dirname(os.path.join("..", cwd))
+   folder = "recordings"
+   data_path = os.path.join(data_dir, folder)
+   items = os.listdir(data_path)
+   
+   try:
       new_dir = os.path.join(data_path, label.title())
       os.mkdir(new_dir)
-    except FileExistsError:
+   except FileExistsError:
       print("Directory already exists.")
+      #exit()
 
-    
-    
-    return items
+   #if msvcrt.getch() == b"s":
+   print(f"Saving file.. in {new_dir}")
+   return items
 
 print(data_labeling(2, "m"))
 

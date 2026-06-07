@@ -2,7 +2,9 @@ from SignalHub import Module, get_nested_key
 from collections import deque
 import numpy as np
 from SignalHub import GALY
-import cv2
+from SignalHub.mode import EngineMode
+import msvcrt
+from SignalHub.configparser import set_nested_key
 
 class TrailMarker(Module):
     """
@@ -181,6 +183,9 @@ class TrailMarker(Module):
 
             ``return { ..., "galy": galy}``
         """
+        if msvcrt.kbhit():
+          if msvcrt.getch()  == b'q':
+            return ({"trailmarker": self.final_trajectory}, EngineMode.TERMINATE)
         galy = GALY()
         detector = data["detector"]
         landmarks = detector.hand_landmarks # Landmarks pro Frame
