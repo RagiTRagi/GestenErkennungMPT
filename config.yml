@@ -8,6 +8,11 @@ recorder:
     - preprocessor
     - hiddenmarkov
     - detector
+  record:
+    - trailmarker
+    - preprocessor
+    - hiddenmarkov
+    - detector
 webcam:
   deviceIndex: 0
   width: 640
