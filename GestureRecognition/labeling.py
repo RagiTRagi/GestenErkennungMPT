@@ -8,6 +8,7 @@ from modules import *
 from SignalHub.galyQT import qt_quit
 import numpy as np#
 import shutil
+import subprocess
 
 def data_labeling(times: int, label: str):
    """
@@ -82,69 +83,53 @@ def data_labeling(times: int, label: str):
       Name der Geste / Klasse.
       Kann ebenfalls frei gestaltet werden (z. B. dynamische Labels, mehrere Klassen gleichzeitig).
    """
-   
-   if msvcrt.getch() == b' ':
-      print("Recording starts..")
 
-      modules = [
-      #ConfigParser(parser),
-      Webcam(),
-      HandDetector(),
-      TrailMarker(),
-      Preprocessor(),
-      HMMModule(),
-      ]
+   while True:
+      print("Click 'space' to record and 'esc' to end the program.")
+      key = msvcrt.getch()
+      if key == b'\x1b': # esc für schließen
+         break
 
-      parser = ArgumentParser("GestureRecognition")
-      parser.add_argument("--mode", action="store")
-      parser.set_defaults(mode="record")
-      config = ConfigParser(parser)
-      data = config.start({"recorder": "replay"})
-      engine = Engine(modules= modules, signals={})
-      engine.run(data)
+      if key == b' ':
+         print("Recording starts..")
 
-      print("Save file press 's'\nDelete file press 'x'")
-      if msvcrt.getch() == b's':
-         cwd = os.getcwd()
-         data_dir = os.path.dirname(os.path.join("..", cwd))
-         folder = "recordings"
-         data_path = os.path.join(data_dir, folder)
-         items = os.listdir(data_path)
-         random1 = np.random.randint(10000, 100000000)
-         random2 = np.random.randint(1000, 1000000)
-         filename = f"{label.lower()}_{random1}_{random2}.pickle"
-         print(filename)
+         subprocess.run([
+            "uv",
+            "run",
+            "main.py",
+            "--mode",
+            "record"
+         ])
+
+         print("Save file press 's'\nDiscard file press 'x'")
+         if msvcrt.getch() == b's':
+            cwd = os.getcwd()
+            data_dir = os.path.dirname(os.path.join("..", cwd))
+            folder = "recordings"
+            data_path = os.path.join(data_dir, folder)
+            # items = os.listdir(data_path)
+
+            random1 = np.random.randint(10000, 100000000)
+            random2 = np.random.randint(1000, 1000000)
+            filename = f"{label.lower()}_{random1}_{random2}.pickle"
+            #print(filename)
+            
+            try:
+               new_dir = os.path.join(data_path, label.title())
+               os.mkdir(new_dir)
+            except FileExistsError:
+               print("Directory already exists.")
+
+            filepath = os.path.join(new_dir,filename)
+            source_path = "record/test.pickle"
+            shutil.copy(source_path, filepath)
+         else:
+            continue
          
-         try:
-            new_dir = os.path.join(data_path, label.title())
-            os.mkdir(new_dir)
-         except FileExistsError:
-            print("Directory already exists.")
-         filepath = os.path.join(new_dir,filename)
-         print(filepath)
-         source_path = get_nested_key("config.recorder.file", data)
-         shutil.move(source_path, filepath)
-
-         
+      
 
 
-      #if msvcrt.getch() == b"s":
-      print(f"Saving file.. in {new_dir}")
-
-      #print("Replay starts..")
-      #parser2 = ArgumentParser("GestureRecognition")
-      #parser2.set_defaults(mode="replay")
-      #config2 = ConfigParser(parser2)
-      #replay_data = config2.start({"recorder": "replay"})
-      #print("Replay", replay_data)
-      #engine = Engine(modules= modules, signals={})
-      #engine.run(replay_data)
-      #print("successful")
-    
-   
-   return items
-
-print(data_labeling(2, "herz"))
+data_labeling(2, "herz")
 
 
 def dataset_building(output_path):

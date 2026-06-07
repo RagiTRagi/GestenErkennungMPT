@@ -183,11 +183,16 @@ class TrailMarker(Module):
 
             ``return { ..., "galy": galy}``
         """
+        #print("TrailMarker step")
+        #print(data.keys())
         if msvcrt.kbhit():
           if msvcrt.getch()  == b'q':
             return ({"trailmarker": self.final_trajectory}, EngineMode.TERMINATE)
         galy = GALY()
         detector = data["detector"]
+        if detector is None:
+          return {"galy": galy}
+        
         landmarks = detector.hand_landmarks # Landmarks pro Frame
         print(self.lost_frames)
 
