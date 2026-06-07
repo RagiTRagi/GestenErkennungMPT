@@ -2,10 +2,12 @@ import os
 import msvcrt
 from argparse import ArgumentParser
 from SignalHub.configparser import ConfigParser
-from SignalHub.engine import Engine
+from SignalHub.engine import Engine, get_nested_key
 from SignalHub.webcam import Webcam
 from modules import *
 from SignalHub.galyQT import qt_quit
+import numpy as np#
+import shutil
 
 def data_labeling(times: int, label: str):
    """
@@ -101,34 +103,48 @@ def data_labeling(times: int, label: str):
       engine = Engine(modules= modules, signals={})
       engine.run(data)
 
-      print("Replay starts..")
-      parser2 = ArgumentParser("GestureRecognition")
-      parser2.set_defaults(mode="replay")
-      config2 = ConfigParser(parser2)
-      replay_data = config2.start({"recorder": "replay"})
-      print("Replay", replay_data)
-      engine = Engine(modules= modules, signals={})
-      engine.run(replay_data)
-      print("successful")
-    
-   cwd = os.getcwd()
-   data_dir = os.path.dirname(os.path.join("..", cwd))
-   folder = "recordings"
-   data_path = os.path.join(data_dir, folder)
-   items = os.listdir(data_path)
-   
-   try:
-      new_dir = os.path.join(data_path, label.title())
-      os.mkdir(new_dir)
-   except FileExistsError:
-      print("Directory already exists.")
-      #exit()
+      print("Save file press 's'\nDelete file press 'x'")
+      if msvcrt.getch() == b's':
+         cwd = os.getcwd()
+         data_dir = os.path.dirname(os.path.join("..", cwd))
+         folder = "recordings"
+         data_path = os.path.join(data_dir, folder)
+         items = os.listdir(data_path)
+         random1 = np.random.randint(10000, 100000000)
+         random2 = np.random.randint(1000, 1000000)
+         filename = f"{label.lower()}_{random1}_{random2}.pickle"
+         print(filename)
+         
+         try:
+            new_dir = os.path.join(data_path, label.title())
+            os.mkdir(new_dir)
+         except FileExistsError:
+            print("Directory already exists.")
+         filepath = os.path.join(new_dir,filename)
+         print(filepath)
+         source_path = get_nested_key("config.recorder.file", data)
+         shutil.move(source_path, filepath)
 
-   #if msvcrt.getch() == b"s":
-   print(f"Saving file.. in {new_dir}")
+         
+
+
+      #if msvcrt.getch() == b"s":
+      print(f"Saving file.. in {new_dir}")
+
+      #print("Replay starts..")
+      #parser2 = ArgumentParser("GestureRecognition")
+      #parser2.set_defaults(mode="replay")
+      #config2 = ConfigParser(parser2)
+      #replay_data = config2.start({"recorder": "replay"})
+      #print("Replay", replay_data)
+      #engine = Engine(modules= modules, signals={})
+      #engine.run(replay_data)
+      #print("successful")
+    
+   
    return items
 
-print(data_labeling(2, "m"))
+print(data_labeling(2, "herz"))
 
 
 def dataset_building(output_path):
