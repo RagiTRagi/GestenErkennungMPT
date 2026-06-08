@@ -4,7 +4,6 @@ import numpy as np
 from SignalHub import GALY
 from SignalHub.mode import EngineMode
 import msvcrt
-from SignalHub.configparser import set_nested_key
 
 class TrailMarker(Module):
     """
@@ -110,8 +109,6 @@ class TrailMarker(Module):
         self.W = get_nested_key("width", config["webcam"])
         self.H = get_nested_key("height", config["webcam"])
 
-        #self.galy = GALY()
-        #self.galy.canvas("Trajectory", shape=(self.H, self.W), color=(0, 0, 0))
 
         self.finger_index = 8 # 8 = Index
         self.trajectory = deque(maxlen=2)
@@ -119,10 +116,13 @@ class TrailMarker(Module):
         self.final_trajectory = deque(maxlen=250)
         self.max_lostframe = 30
         #self.key = cv2.waitKey(1)
+        window_size = 5
+        self.kernel_window = np.ones(window_size) / window_size
         return {}
     
     def draw_trajectory(self, galy):
-       for i in range(len(self.final_trajectory)):
+       smoothed_traj = np.convolve(self.final_trajectory, self.kernel_window, mode="valid")
+       for i in range(len(smoothed_traj)):
             if i == 0:
               continue
             curr_pt = self.final_trajectory[i]
@@ -183,18 +183,17 @@ class TrailMarker(Module):
 
             ``return { ..., "galy": galy}``
         """
-        #print("TrailMarker step")
-        #print(data.keys())
         if msvcrt.kbhit():
           if msvcrt.getch()  == b'q':
-            return ({"trailmarker": self.final_trajectory}, EngineMode.TERMINATE)
+            return ({}, EngineMode.TERMINATE)
+          
         galy = GALY()
         detector = data["detector"]
+
         if detector is None:
           return {"galy": galy}
         
         landmarks = detector.hand_landmarks # Landmarks pro Frame
-        print(self.lost_frames)
 
         
         if landmarks is None or len(landmarks) == 0:
@@ -224,10 +223,9 @@ class TrailMarker(Module):
         pt = (px, py)
         self.trajectory.append(pt)
 
-        print(self.final_trajectory)
         if len(self.trajectory) == 1:
           self.final_trajectory.append(self.trajectory[0])
-          return {"galy": galy}
+          return {"trailmarker": pt, "galy": galy}
 
         previous_pt = self.trajectory[-2]
         current_pt = self.trajectory[-1]
@@ -241,7 +239,7 @@ class TrailMarker(Module):
         
         self.final_trajectory.append(current_pt)
         self.draw_trajectory(galy)
-        return {"trailmarker":self.final_trajectory,"galy": galy}
+        return {"trailmarker": current_pt, "galy": galy}
 
     def stop(self, data):
         """
@@ -263,5 +261,6 @@ class TrailMarker(Module):
         data : dict
             Letzte übergebene Daten des Frameworks.
         """
-        return {"trailmarker": self.final_trajectory}
+        return {}
+        #return {"trailmarker": self.final_trajectory.copy()}
     

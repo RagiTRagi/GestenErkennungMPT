@@ -1,12 +1,7 @@
 import os
 import msvcrt
-from argparse import ArgumentParser
-from SignalHub.configparser import ConfigParser
-from SignalHub.engine import Engine, get_nested_key
-from SignalHub.webcam import Webcam
-from modules import *
-from SignalHub.galyQT import qt_quit
-import numpy as np#
+import numpy as np
+import pickle
 import shutil
 import subprocess
 
@@ -83,7 +78,7 @@ def data_labeling(times: int, label: str):
       Name der Geste / Klasse.
       Kann ebenfalls frei gestaltet werden (z. B. dynamische Labels, mehrere Klassen gleichzeitig).
    """
-
+   # TO DO Input um label bei einem run wechseln zu können
    while True:
       print("Click 'space' to record and 'esc' to end the program.")
       key = msvcrt.getch()
@@ -107,12 +102,10 @@ def data_labeling(times: int, label: str):
             data_dir = os.path.dirname(os.path.join("..", cwd))
             folder = "recordings"
             data_path = os.path.join(data_dir, folder)
-            # items = os.listdir(data_path)
 
             random1 = np.random.randint(10000, 100000000)
             random2 = np.random.randint(1000, 1000000)
-            filename = f"{label.lower()}_{random1}_{random2}.pickle"
-            #print(filename)
+            filename = f"{label.title()}_{random1}_{random2}.pickle"
             
             try:
                new_dir = os.path.join(data_path, label.title())
@@ -125,9 +118,6 @@ def data_labeling(times: int, label: str):
             shutil.copy(source_path, filepath)
          else:
             continue
-         
-      
-
 
 data_labeling(2, "herz")
 
@@ -201,4 +191,46 @@ def dataset_building(output_path):
     output_path : Path or str
         Zielpfad für den erzeugten Trainingsdatensatz.
     """
-    pass
+    test = "C:\\Users\\amols\\Documents\\Unikram\\4.Semester\\Machine_Perception_Tracking\\recordings\\Herz\\Herz_22967535_554683.pickle"
+    with open(test, "rb") as f:
+       loaded_pickle = pickle.load(f)
+    #print(loaded_pickle)
+    print(type(loaded_pickle))
+    print(loaded_pickle["detector"])
+       
+    
+    X = []
+    y = []
+    dataset = {
+      "X": X,
+      "y": y
+    }
+    
+    cwd = os.getcwd()
+    dir = os.path.dirname(cwd)
+    data_folder = "recordings"
+    folder_path = os.path.join(dir, data_folder)
+    labels = os.listdir(folder_path)
+
+    for label in labels:
+       label_path = os.path.join(folder_path, label)
+       samples = os.listdir(label_path)
+       #print(samples)
+       for sample in samples:
+          y.append(label)
+          filename = sample
+          filepath = os.path.join(label_path, filename) # keine galy objekte 
+          #with open(filepath, "rb") as file:
+          #   data = pickle.load(file)
+             # X.append(data)
+      
+
+      # Datensatz
+      # keine galy objekte 
+          
+       
+    source_path = None
+    
+    return os.listdir(folder_path)
+
+#print(dataset_building("s"))
