@@ -8,7 +8,7 @@ import subprocess
 def data_labeling(times: int, label: str):
    """
    TODO: data_labeling: Datenerfassung für Gesten (SignalHub)
-
+       
    Ziel:
    -----
    Implementiere eine Funktion, mit der Trainingsdaten für eine bestimmte
@@ -79,7 +79,9 @@ def data_labeling(times: int, label: str):
       Kann ebenfalls frei gestaltet werden (z. B. dynamische Labels, mehrere Klassen gleichzeitig).
    """
    # TO DO Input um label bei einem run wechseln zu können
+   label = input("what label do you want to record?")
    while True:
+      
       print("Click 'space' to record and 'esc' to end the program.")
       key = msvcrt.getch()
       if key == b'\x1b': # esc für schließen
@@ -119,7 +121,7 @@ def data_labeling(times: int, label: str):
          else:
             continue
 
-data_labeling(2, "herz")
+#data_labeling(1, "herz")
 
 
 def dataset_building(output_path):
@@ -191,15 +193,50 @@ def dataset_building(output_path):
     output_path : Path or str
         Zielpfad für den erzeugten Trainingsdatensatz.
     """
-    test = "C:\\Users\\amols\\Documents\\Unikram\\4.Semester\\Machine_Perception_Tracking\\recordings\\Herz\\Herz_22967535_554683.pickle"
+    test = "C:\\Users\\amols\\Documents\\Unikram\\4.Semester\\Machine_Perception_Tracking\\recordings\\Dreieck\\Dreieck_84957763_272562.pickle"
+    trailmarker_sequence = []
     with open(test, "rb") as f:
        loaded_pickle = pickle.load(f)
-    #print(loaded_pickle)
-    print(type(loaded_pickle))
-    print(loaded_pickle["detector"])
+       #print(loaded_pickle)
+          
+    trailmarker = loaded_pickle["trailmarker"]
+    for pt in trailmarker[:]:
+       if pt is None or len(pt) == 0:
+          #print(pt)
+          continue
+       if type(pt) == tuple:
+          continue
+       if "galy" in pt.keys() and len(pt) == 1:
+         continue
        
+       trailmarker_sequence.append(pt["trailmarker"])
+    print(len(trailmarker_sequence), trailmarker_sequence)
+       
+    preprocessor_data = []
     
-    X = []
+    preprocessor = loaded_pickle["preprocessor"]
+    #print(preprocessor)
+    for sequ in preprocessor[:]:
+
+       if sequ is None or len(sequ) == 0:
+          continue
+       
+       if sequ["preprocessor"] is None:
+          #preprocessor_sequence.append(None)
+          continue
+
+       data = sequ["preprocessor"]
+       preprocessor_data.append(data)
+    preprocessor_sequence = preprocessor_data[-1]
+    #print(len(preprocessor_sequence), preprocessor_sequence)
+    print(type(trailmarker_sequence[0]))
+    print(trailmarker_sequence[0])
+
+    print(type(preprocessor_sequence))
+    print("PRE",preprocessor_sequence.shape)
+    print("TRA",len(trailmarker_sequence))
+    
+    X = [{"trailmarker": trailmarker_sequence, "preprocessor": preprocessor_sequence}]
     y = []
     dataset = {
       "X": X,
@@ -223,10 +260,6 @@ def dataset_building(output_path):
           #with open(filepath, "rb") as file:
           #   data = pickle.load(file)
              # X.append(data)
-      
-
-      # Datensatz
-      # keine galy objekte 
           
        
     source_path = None
