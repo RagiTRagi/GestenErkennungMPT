@@ -226,26 +226,11 @@ def dataset_building(output_path):
 
           with open(filepath, "rb") as f:
             loaded_pickle = pickle.load(f)
-            
-          trailmarker = loaded_pickle["trailmarker"]
-
-          for pt in trailmarker[:]:
-
-            if pt is None or len(pt) == 0:
-               continue
-
-            if type(pt) == tuple:
-               continue
-
-            if "galy" in pt.keys() and len(pt) == 1:
-               continue
-             
-            trailmarker_sequence.append(pt["trailmarker"])
           
           preprocessor_data = []
           preprocessor = loaded_pickle["preprocessor"]
 
-          for sequ in preprocessor[:]:
+          for sequ in preprocessor:
 
             if sequ is None or len(sequ) == 0:
                continue
@@ -258,11 +243,8 @@ def dataset_building(output_path):
             last_sequence = preprocessor_data[-1]
           lengths.append(len(last_sequence))
           
-          X.append({
-             "trailmarker": trailmarker_sequence,
-             "preprocessor": last_sequence,
-          })
-       #lengths.append(count)
+          X.extend(last_sequence)
+       
 
     print(dataset["lengths"])
     print(output_path)
