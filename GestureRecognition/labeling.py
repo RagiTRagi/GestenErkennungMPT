@@ -5,7 +5,7 @@ import pickle
 import shutil
 import subprocess
 
-def data_labeling(times: int, label: str):
+def data_labeling():
    """
    TODO: data_labeling: Datenerfassung für Gesten (SignalHub)
        
@@ -121,7 +121,7 @@ def data_labeling(times: int, label: str):
          else:
             continue
 
-#data_labeling(1, "herz")
+#data_labeling()
 
 
 def dataset_building(output_path):
@@ -193,77 +193,82 @@ def dataset_building(output_path):
     output_path : Path or str
         Zielpfad für den erzeugten Trainingsdatensatz.
     """
-    test = "C:\\Users\\amols\\Documents\\Unikram\\4.Semester\\Machine_Perception_Tracking\\recordings\\Dreieck\\Dreieck_84957763_272562.pickle"
-    trailmarker_sequence = []
-    with open(test, "rb") as f:
-       loaded_pickle = pickle.load(f)
-       #print(loaded_pickle)
-          
-    trailmarker = loaded_pickle["trailmarker"]
-    for pt in trailmarker[:]:
-       if pt is None or len(pt) == 0:
-          #print(pt)
-          continue
-       if type(pt) == tuple:
-          continue
-       if "galy" in pt.keys() and len(pt) == 1:
-         continue
-       
-       trailmarker_sequence.append(pt["trailmarker"])
-    print(len(trailmarker_sequence), trailmarker_sequence)
-       
-    preprocessor_data = []
-    
-    preprocessor = loaded_pickle["preprocessor"]
-    #print(preprocessor)
-    for sequ in preprocessor[:]:
-
-       if sequ is None or len(sequ) == 0:
-          continue
-       
-       if sequ["preprocessor"] is None:
-          #preprocessor_sequence.append(None)
-          continue
-
-       data = sequ["preprocessor"]
-       preprocessor_data.append(data)
-    preprocessor_sequence = preprocessor_data[-1]
-    #print(len(preprocessor_sequence), preprocessor_sequence)
-    print(type(trailmarker_sequence[0]))
-    print(trailmarker_sequence[0])
-
-    print(type(preprocessor_sequence))
-    print("PRE",preprocessor_sequence.shape)
-    print("TRA",len(trailmarker_sequence))
-    
-    X = [{"trailmarker": trailmarker_sequence, "preprocessor": preprocessor_sequence}]
     y = []
+    X = []
+    lengths = []
+
     dataset = {
-      "X": X,
-      "y": y
+         "X": X,
+         "y": y,
+         "lengths" : lengths
     }
-    
+
     cwd = os.getcwd()
     dir = os.path.dirname(cwd)
     data_folder = "recordings"
     folder_path = os.path.join(dir, data_folder)
-    labels = os.listdir(folder_path)
+    labels = os.listdir(folder_path)    
 
     for label in labels:
+       
        label_path = os.path.join(folder_path, label)
        samples = os.listdir(label_path)
-       #print(samples)
-       for sample in samples:
-          y.append(label)
-          filename = sample
-          filepath = os.path.join(label_path, filename) # keine galy objekte 
-          #with open(filepath, "rb") as file:
-          #   data = pickle.load(file)
-             # X.append(data)
-          
        
-    source_path = None
-    
-    return os.listdir(folder_path)
+       count = 0
+       for sample in samples:
+          count += 1
+          trailmarker_sequence = []
+          preprocessor_sequence = []
+          y.append(label)
 
-#print(dataset_building("s"))
+          filename = sample
+          filepath = os.path.join(label_path, filename)
+
+          with open(filepath, "rb") as f:
+            loaded_pickle = pickle.load(f)
+            
+          trailmarker = loaded_pickle["trailmarker"]
+
+          for pt in trailmarker[:]:
+
+            if pt is None or len(pt) == 0:
+               continue
+
+            if type(pt) == tuple:
+               continue
+
+            if "galy" in pt.keys() and len(pt) == 1:
+               continue
+             
+            trailmarker_sequence.append(pt["trailmarker"])
+          
+          preprocessor_data = []
+          preprocessor = loaded_pickle["preprocessor"]
+
+          for sequ in preprocessor[:]:
+
+            if sequ is None or len(sequ) == 0:
+               continue
+            
+            if sequ["preprocessor"] is None:
+               continue
+
+            data = sequ["preprocessor"]
+            preprocessor_data.append(data)
+            last_sequence = preprocessor_data[-1]
+          lengths.append(len(last_sequence))
+          
+          X.append({
+             "trailmarker": trailmarker_sequence,
+             "preprocessor": last_sequence,
+          })
+       #lengths.append(count)
+
+    print(dataset["lengths"])
+    print(output_path)
+    with open(output_path, "wb") as f:
+       pickle.dump(dataset, f)
+    
+    return None
+
+print(dataset_building("C:\\Users\\amols\\Documents\\Unikram\\4.Semester\\Machine_Perception_Tracking\\dataset.pkl"))
