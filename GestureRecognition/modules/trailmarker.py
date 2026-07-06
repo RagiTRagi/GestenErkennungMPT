@@ -252,7 +252,6 @@ class TrailMarker(Module):
       
       self.final_trajectory.append(current_pt)
       self.draw_trajectory(galy)
-      print("TRAIL", len(self.final_trajectory))
       return {"trailmarker": current_pt, "galy": galy}
 
     def stop(self, data):
