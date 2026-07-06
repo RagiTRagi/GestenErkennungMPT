@@ -121,11 +121,11 @@ def data_labeling():
          else:
             continue
 
-#data_labeling()
+data_labeling()
 
 
 def dataset_building(output_path):
-    """
+   """
     TODO: dataset_building: Trainingsdatensatz aus aufgenommenen Gesten erstellen
 
     Ziel:
@@ -192,45 +192,45 @@ def dataset_building(output_path):
     ----------
     output_path : Path or str
         Zielpfad für den erzeugten Trainingsdatensatz.
-    """
-    y = []
-    X = []
-    lengths = []
+   """
+   y = []
+   X = []
+   lengths = []
 
-    dataset = {
+   dataset = {
          "X": X,
          "y": y,
          "lengths" : lengths
-    }
+   }
 
-    cwd = os.getcwd()
-    dir = os.path.dirname(cwd)
-    data_folder = "recordings"
-    folder_path = os.path.join(dir, data_folder)
-    labels = os.listdir(folder_path)    
+   cwd = os.getcwd()
+   dir = os.path.dirname(cwd)
+   data_folder = "recordings"
+   folder_path = os.path.join(dir, data_folder)
+   labels = os.listdir(folder_path)    
 
-    for label in labels:
+   for label in labels:
        
-       label_path = os.path.join(folder_path, label)
-       samples = os.listdir(label_path)
+      label_path = os.path.join(folder_path, label)
+      samples = os.listdir(label_path)
        
-       count = 0
-       for sample in samples:
-          count += 1
-          trailmarker_sequence = []
-          preprocessor_sequence = []
-          y.append(label)
+      count = 0
+      for sample in samples:
+         count += 1
+         trailmarker_sequence = []
+         preprocessor_sequence = []
+         y.append(label)
 
-          filename = sample
-          filepath = os.path.join(label_path, filename)
+         filename = sample
+         filepath = os.path.join(label_path, filename)
 
-          with open(filepath, "rb") as f:
-            loaded_pickle = pickle.load(f)
+         with open(filepath, "rb") as f:
+           loaded_pickle = pickle.load(f)
           
-          preprocessor_data = []
-          preprocessor = loaded_pickle["preprocessor"]
+         preprocessor_data = []
+         preprocessor = loaded_pickle["preprocessor"]
 
-          for sequ in preprocessor:
+         for sequ in preprocessor:
 
             if sequ is None or len(sequ) == 0:
                continue
@@ -241,16 +241,20 @@ def dataset_building(output_path):
             data = sequ["preprocessor"]
             preprocessor_data.append(data)
             last_sequence = preprocessor_data[-1]
-          lengths.append(len(last_sequence))
+         lengths.append(len(last_sequence))
           
-          X.extend(last_sequence)
+         X.extend(last_sequence)
        
 
-    print(dataset["lengths"])
-    print(output_path)
-    with open(output_path, "wb") as f:
-       pickle.dump(dataset, f)
-    
-    return None
+   print(dataset["lengths"])
+   print(output_path)
+   with open(output_path, "wb") as f:
+      pickle.dump(dataset, f)
+   
+   return None
 
-print(dataset_building("C:\\Users\\amols\\Documents\\Unikram\\4.Semester\\Machine_Perception_Tracking\\dataset.pkl"))
+cwd = os.getcwd()
+dir = os.path.dirname(cwd)
+dataset_path = os.path.join(dir, "dataset.pkl")
+
+print(dataset_building(dataset_path))
