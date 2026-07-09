@@ -80,6 +80,14 @@ def data_labeling():
        Kann ebenfalls frei gestaltet werden (z. B. dynamische Labels, mehrere Klassen gleichzeitig).
     """
     # TO DO Input um label bei einem run wechseln zu können
+    cwd = os.getcwd()
+    data_dir = os.path.dirname(os.path.join("..", cwd))
+    folder = "recordings1"
+    data_path = os.path.join(data_dir, folder)
+
+    if not os.path.exists(data_path):
+        os.mkdir(data_path)
+
     label = input("what label do you want to record?")
     while True:
 
@@ -95,17 +103,13 @@ def data_labeling():
 
             print("Save file press 's'\nDiscard file press 'x'")
             if msvcrt.getch() == b"s":
-                cwd = os.getcwd()
-                data_dir = os.path.dirname(os.path.join("..", cwd))
-                folder = "recordings"
-                data_path = os.path.join(data_dir, folder)
-
+        
                 random1 = np.random.randint(10000, 100000000)
                 random2 = np.random.randint(1000, 1000000)
                 filename = f"{label.title()}_{random1}_{random2}.pickle"
 
+                new_dir = os.path.join(data_path, label.title())
                 try:
-                    new_dir = os.path.join(data_path, label.title())
                     os.mkdir(new_dir)
                 except FileExistsError:
                     print("Directory already exists.")
@@ -121,7 +125,7 @@ data_labeling()
 
 
 def dataset_building(output_path):
-   """
+    """
     TODO: dataset_building: Trainingsdatensatz aus aufgenommenen Gesten erstellen
 
     Ziel:
