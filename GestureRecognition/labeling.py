@@ -15,37 +15,37 @@ def data_labeling():
     Implementiere eine Funktion, mit der Trainingsdaten für eine bestimmte
     Geste aufgenommen und gespeichert werden können.
 
-    Anforderungen / Ideen:
-    ----------------------
+   Anforderungen / Ideen:
+   ----------------------
 
-    1. Aufnahme starten
+   1. Aufnahme starten
 
-       - Starte SignalHub über einen Subprocess
-       - Übergib einen Dateipfad für die Aufnahme
-       - Überlege, welche Module aufgenommen werden sollen
-       - Nimm entsprechende Änderungen in der ``config.yaml`` vor
+      - Starte SignalHub über einen Subprocess
+      - Übergib einen Dateipfad für die Aufnahme
+      - Überlege, welche Module aufgenommen werden sollen
+      - Nimm entsprechende Änderungen in der ``config.yaml`` vor
 
-    2. Interaktive Steuerung (optional)
+   2. Interaktive Steuerung (optional)
 
        - Implementiere eine einfache Benutzerinteraktion:
        - Aufnahme speichern
        - Aufnahme verwerfen
        - Programm beenden
 
-    .. tip::
+   .. tip::
 
-       Die Funktion ``getch()`` (Aus dem Modul Linux :mod:`getch` oder bei Windows :mod:`msvcrt`) ist sehr hilfreich, um einzelne Tastendrücke
-       direkt auszulesen (ohne Enter). Damit kannst du dir ein schnelles
-       Labeling-Interface bauen.
+      Die Funktion ``getch()`` (Aus dem Modul Linux :mod:`getch` oder bei Windows :mod:`msvcrt`) ist sehr hilfreich, um einzelne Tastendrücke
+      direkt auszulesen (ohne Enter). Damit kannst du dir ein schnelles
+      Labeling-Interface bauen.
 
-       Beispiel:
+      Beispiel:
 
-       .. code-block:: text
+      .. code-block:: text
 
           ESC → speichern
           andere Taste → verwerfen
 
-    3. Daten sichten und bereinigen
+   3. Daten sichten und bereinigen
 
        - Lade die aufgenommenen Daten
        - Überlege:
@@ -54,20 +54,20 @@ def data_labeling():
        - Sollten gewisse Sequenzen evtl. gar nicht benutzt werden?
        - Entferne unnötige Anteile (z. B. keine erkannte Hand am Anfang/Ende)
 
-    4. Speicherung
+   4. Speicherung
 
-       - Speichere Daten strukturiert nach Labels (z. B. Ordnerstruktur)
-       - Jede Aufnahme sollte einzeln gespeichert werden
+      - Speichere Daten strukturiert nach Labels (z. B. Ordnerstruktur)
+      - Jede Aufnahme sollte einzeln gespeichert werden
 
-    .. note::
+   .. note::
 
-       Die konkrete Umsetzung (Dateiformat, Struktur, Ablauf) ist bewusst offen.
-       Entwickle ein System, das für dich sinnvoll ist und sich gut weiterverarbeiten lässt.
+      Die konkrete Umsetzung (Dateiformat, Struktur, Ablauf) ist bewusst offen.
+      Entwickle ein System, das für dich sinnvoll ist und sich gut weiterverarbeiten lässt.
 
-    .. warning::
+   .. warning::
 
-       Ziel ist nicht nur, dass es „funktioniert“, sondern ein sauberer und
-       effizienter Workflow für Datensammlung.
+      Ziel ist nicht nur, dass es „funktioniert“, sondern ein sauberer und
+      effizienter Workflow für Datensammlung.
 
     Parameters
     ----------
@@ -80,6 +80,14 @@ def data_labeling():
        Kann ebenfalls frei gestaltet werden (z. B. dynamische Labels, mehrere Klassen gleichzeitig).
     """
     # TO DO Input um label bei einem run wechseln zu können
+    cwd = os.getcwd()
+    data_dir = os.path.dirname(os.path.join("..", cwd))
+    folder = "recordings1"
+    data_path = os.path.join(data_dir, folder)
+
+    if not os.path.exists(data_path):
+        os.mkdir(data_path)
+
     label = input("what label do you want to record?")
     while True:
 
@@ -95,17 +103,13 @@ def data_labeling():
 
             print("Save file press 's'\nDiscard file press 'x'")
             if msvcrt.getch() == b"s":
-                cwd = os.getcwd()
-                data_dir = os.path.dirname(os.path.join("..", cwd))
-                folder = "recordings"
-                data_path = os.path.join(data_dir, folder)
-
+        
                 random1 = np.random.randint(10000, 100000000)
                 random2 = np.random.randint(1000, 1000000)
                 filename = f"{label.title()}_{random1}_{random2}.pickle"
 
+                new_dir = os.path.join(data_path, label.title())
                 try:
-                    new_dir = os.path.join(data_path, label.title())
                     os.mkdir(new_dir)
                 except FileExistsError:
                     print("Directory already exists.")

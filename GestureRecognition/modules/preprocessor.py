@@ -114,6 +114,12 @@ class Preprocessor(Module):
 
         self.trajectory = deque(maxlen=buffer_size)
         self.lost_count = 0
+
+        self.W = get_nested_key("webcam.width", config)
+        self.H = get_nested_key("webcam.height", config)
+
+        window_size = 3
+        self.kernel_window = np.ones(window_size) / window_size
         return {}
 
     def step(self, data):
@@ -177,25 +183,57 @@ class Preprocessor(Module):
         detector_result = data.get("detector")
 
         if detector_result is not None and detector_result.handedness:
-            lm = detector_result.hand_landmarks[0][self.finger_idx]
-            self.trajectory.append((lm.x, lm.y))
             self.lost_count = 0
+
+            finger_landmark = detector_result.hand_landmarks[0][self.finger_idx]
+            pip = detector_result.hand_landmarks[0][self.finger_idx - 2]
+
+            extended_finger = finger_landmark.y < pip.y
+
+            current_pt = (
+                finger_landmark.x * self.W,
+                finger_landmark.y * self.H
+            )
+
+            if extended_finger:
+                if len(self.trajectory) == 0:
+                    self.trajectory.append(current_pt)
+                else:
+                    previous_pt = self.trajectory[-1]
+
+                    d = np.sqrt(
+                        (previous_pt[0] - current_pt[0])**2 +
+                        (previous_pt[1] - current_pt[1])**2
+                    )
+
+                    if 1.0 <= d <= 60.0:
+                        self.trajectory.append(current_pt)
+
         else:
             self.lost_count += 1
+
             if self.lost_count > self.max_lost:
                 self.trajectory.clear()
 
         if len(self.trajectory) < self.min_steps:
             return {self.outputSignal: None}
+        
 
         pts = np.array(self.trajectory)
+        x = pts[:, 0]
+        y = pts[:, 1]
+        smoothed_x = np.convolve(x, self.kernel_window, mode="valid")
+        smoothed_y = np.convolve(y, self.kernel_window, mode="valid")
+        pts = np.column_stack((smoothed_x, smoothed_y))
+
         pts = pts - pts.mean(axis=0)
+
         scale = np.abs(pts).max()
         if scale > 0:
             pts = pts / scale
 
         return {self.outputSignal: pts}
-
+        
     def stop(self, data):
         """
         Wird aufgerufen, wenn das Modul beendet wird.

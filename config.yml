@@ -1,6 +1,6 @@
 engine:
   speed: 4
-  autoclose: False
+  autoclose: True
 recorder:
   file: record/test.pickle
   record:
@@ -13,10 +13,13 @@ recorder:
     - preprocessor
     - hiddenmarkov
     - detector
+  record:
+    - trailmarker
+    - preprocessor
 webcam:
   deviceIndex: 0
   width: 640
-  height: 360
+  height: 480
   dtype: u8
   flip: True
 preprocessor:

@@ -32,6 +32,7 @@ def draw_hand_landmarks(hand_landmarks, galy: GALY, w, h):
             y = min(y, start[1], end[1])
             galy.line(start, end, lm[key]["color"], 2)
             pts.update([conn.start, conn.end])
+            #print(pts)
         for pt in pts:
             galy.circle((int(hand_landmarks[pt].x * w), int(hand_landmarks[pt].y * h)), 5, (255,255,255), 1)
             galy.circle((int(hand_landmarks[pt].x * w), int(hand_landmarks[pt].y * h)), 4, lm[key]["color"], -1)
@@ -213,6 +214,7 @@ class HandDetector(Module):
             result = self.detector.detect(mp_image)
 
             galy = GALY()
+            galy.canvas("hand landmarks", (h, w), (0, 0, 0), dtype=np.uint8)
 
             if result.hand_landmarks:
                 for hand_lms in result.hand_landmarks:
