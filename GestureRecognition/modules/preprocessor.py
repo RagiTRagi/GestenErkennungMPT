@@ -108,9 +108,9 @@ class Preprocessor(Module):
         """
         config = data["config"]
         self.finger_idx = get_nested_key("preprocessor.finger_idx", config)
-        self.max_lost   = get_nested_key("preprocessor.max_lost",   config)
-        self.min_steps  = get_nested_key("preprocessor.min_steps",  config)
-        buffer_size     = get_nested_key("preprocessor.buffer_size", config)
+        self.max_lost = get_nested_key("preprocessor.max_lost", config)
+        self.min_steps = get_nested_key("preprocessor.min_steps", config)
+        buffer_size = get_nested_key("preprocessor.buffer_size", config)
 
         self.trajectory = deque(maxlen=buffer_size)
         self.lost_count = 0

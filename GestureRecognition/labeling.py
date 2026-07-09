@@ -8,12 +8,12 @@ import subprocess
 
 def data_labeling():
     """
-    TODO: data_labeling: Datenerfassung für Gesten (SignalHub)
+     TODO: data_labeling: Datenerfassung für Gesten (SignalHub)
 
-    Ziel:
-    -----
-    Implementiere eine Funktion, mit der Trainingsdaten für eine bestimmte
-    Geste aufgenommen und gespeichert werden können.
+     Ziel:
+     -----
+     Implementiere eine Funktion, mit der Trainingsdaten für eine bestimmte
+     Geste aufgenommen und gespeichert werden können.
 
     Anforderungen / Ideen:
     ----------------------
@@ -27,10 +27,10 @@ def data_labeling():
 
     2. Interaktive Steuerung (optional)
 
-       - Implementiere eine einfache Benutzerinteraktion:
-       - Aufnahme speichern
-       - Aufnahme verwerfen
-       - Programm beenden
+        - Implementiere eine einfache Benutzerinteraktion:
+        - Aufnahme speichern
+        - Aufnahme verwerfen
+        - Programm beenden
 
     .. tip::
 
@@ -47,12 +47,12 @@ def data_labeling():
 
     3. Daten sichten und bereinigen
 
-       - Lade die aufgenommenen Daten
-       - Überlege:
-       - Welche Teile sind relevant?
-       - Welche Frames sind leer oder unbrauchbar?
-       - Sollten gewisse Sequenzen evtl. gar nicht benutzt werden?
-       - Entferne unnötige Anteile (z. B. keine erkannte Hand am Anfang/Ende)
+        - Lade die aufgenommenen Daten
+        - Überlege:
+        - Welche Teile sind relevant?
+        - Welche Frames sind leer oder unbrauchbar?
+        - Sollten gewisse Sequenzen evtl. gar nicht benutzt werden?
+        - Entferne unnötige Anteile (z. B. keine erkannte Hand am Anfang/Ende)
 
     4. Speicherung
 
