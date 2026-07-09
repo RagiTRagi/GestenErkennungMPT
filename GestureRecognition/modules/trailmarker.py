@@ -3,11 +3,8 @@ from collections import deque
 import numpy as np
 from SignalHub import GALY
 from SignalHub.mode import EngineMode
+import msvcrt
 
-try:
-  import msvcrt
-except ImportError:
-  msvcrt = None
 
 class TrailMarker(Module):
     """
@@ -65,29 +62,6 @@ class TrailMarker(Module):
             outputSchema={"type": "object", "properties": {outputSignal: {}}},
             name="trailmarker",
         )
-        self.outputSignal = outputSignal
-
-      def _should_terminate(self):
-        if msvcrt is None:
-          return False
-
-        if not msvcrt.kbhit():
-          return False
-
-        return msvcrt.getch() == b"q"
-
-      def _load_settings(self, config):
-        settings = config.get("trailmarker", {}) if isinstance(config, dict) else {}
-
-        return {
-          "hand_index": settings.get("hand_index", 0),
-          "finger_index": settings.get("finger_index", 8),
-          "max_lost_frames": settings.get("max_lost_frames", settings.get("max_lost", 30)),
-          "smoothing_window": settings.get("smoothing_window", 3),
-          "min_step_distance": settings.get("min_step_distance", 1.0),
-          "max_step_distance": settings.get("max_step_distance", 60.0),
-          "pip_offset": settings.get("pip_offset", 2),
-        }
 
     def start(self, data):
         """
@@ -131,43 +105,31 @@ class TrailMarker(Module):
         dict
             Ein leeres Dictionary.
         """
-        
+
         config = data["config"]
-        settings = self._load_settings(config)
         self.W = get_nested_key("width", config["webcam"])
         self.H = get_nested_key("height", config["webcam"])
 
-        self.lost_frames = 0
-        self.max_lostframe = settings["max_lost_frames"]
-        self.hand_index = settings["hand_index"]
-        self.finger_index = settings["finger_index"]
-        self.pip_offset = settings["pip_offset"]
-        self.min_step_distance = float(settings["min_step_distance"])
-        self.max_step_distance = float(settings["max_step_distance"])
-
+        self.finger_index = 8  # 8 = Index
         self.trajectory = deque(maxlen=2)
+        self.lost_frames = 0
         self.final_trajectory = deque(maxlen=250)
-        
-        window_size = max(1, int(settings["smoothing_window"]))
+        self.max_lostframe = 30
+        # self.key = cv2.waitKey(1)
+        window_size = 5
         self.kernel_window = np.ones(window_size) / window_size
         return {}
-    
+
     def draw_trajectory(self, galy):
-        if len(self.final_trajectory) < len(self.kernel_window):
-          return
-
-        traj = np.array(self.final_trajectory)
-        x = traj[:, 0]
-        y = traj[:, 1]
-
-        smoothed_x = np.convolve(x, self.kernel_window, mode="valid")
-        smoothed_y = np.convolve(y, self.kernel_window, mode="valid")
-        smoothed_traj = list(zip(smoothed_x, smoothed_y))
-
-        for i in range(1, len(smoothed_traj)):
-          curr_pt = tuple(np.round(smoothed_traj[i]).astype(int))
-          prev_pt = tuple(np.round(smoothed_traj[i - 1]).astype(int))
-          galy.line(curr_pt, prev_pt, (64, 224, 208))
+        smoothed_traj = np.convolve(
+            self.final_trajectory, self.kernel_window, mode="valid"
+        )
+        for i in range(len(smoothed_traj)):
+            if i == 0:
+                continue
+            curr_pt = self.final_trajectory[i]
+            prev_pt = self.final_trajectory[i - 1]
+            galy.line(curr_pt, prev_pt, (64, 224, 208))
 
     def step(self, data):
         """
@@ -222,68 +184,67 @@ class TrailMarker(Module):
 
             ``return { ..., "galy": galy}``
         """
-        if self._should_terminate():
-            return ({}, EngineMode.TERMINATE)
-          
+        if msvcrt.kbhit():
+            if msvcrt.getch() == b"q":
+                return ({}, EngineMode.TERMINATE)
+
         galy = GALY()
         detector = data["detector"]
 
         if detector is None:
-          return {"galy": galy}
-        
-        landmarks = detector.hand_landmarks # Landmarks pro Frame
-
-        
-        if landmarks is None or len(landmarks) == 0:
-          self.lost_frames += 1
-
-          if self.lost_frames >= self.max_lostframe:
-            self.final_trajectory.clear()
-            self.trajectory.clear()
-            self.lost_frames = 0
             return {"galy": galy}
-          
-          self.draw_trajectory(galy)
-          return {"galy": galy}
-        
-        self.lost_frames = 0
 
-        hand_landmarks = landmarks[self.hand_index]
-        if self.finger_index >= len(hand_landmarks):
+        landmarks = detector.hand_landmarks  # Landmarks pro Frame
+
+        if landmarks is None or len(landmarks) == 0:
+            self.lost_frames += 1
+
+            if self.lost_frames >= self.max_lostframe:
+                self.final_trajectory.clear()
+                self.trajectory.clear()
+                self.lost_frames = 0
+                return {"galy": galy}
+
             self.draw_trajectory(galy)
             return {"galy": galy}
 
-        finger_landmark = hand_landmarks[self.finger_index]
-        pip_index = max(0, self.finger_index - self.pip_offset)
-        pip = hand_landmarks[pip_index]
+        self.lost_frames = 0
+
+        finger_landmark = landmarks[0][
+            self.finger_index
+        ]  # Landmarken des Fingers extrahieren
+        pip = landmarks[0][self.finger_index - 2]
         extended_finger = finger_landmark.y < pip.y
 
         if not extended_finger:
             self.draw_trajectory(galy)
             return {"galy": galy}
-        
-        px = int(np.clip(finger_landmark.x * self.W, 0, self.W - 1))
-        py = int(np.clip(finger_landmark.y * self.H, 0, self.H - 1))
+
+        px = np.clip(finger_landmark.x * self.W, 0, self.W - 1)
+        py = np.clip(finger_landmark.y * self.H, 0, self.H - 1)
         pt = (px, py)
         self.trajectory.append(pt)
 
         if len(self.trajectory) == 1:
-          self.final_trajectory.append(self.trajectory[0])
-          return {self.outputSignal: pt, "galy": galy}
+            self.final_trajectory.append(self.trajectory[0])
+            return {"trailmarker": pt, "galy": galy}
 
         previous_pt = self.trajectory[-2]
         current_pt = self.trajectory[-1]
 
-        d = np.sqrt((previous_pt[0]-current_pt[0])**2 + (previous_pt[1]-current_pt[1])**2)
+        d = np.sqrt(
+            (previous_pt[0] - current_pt[0]) ** 2
+            + (previous_pt[1] - current_pt[1]) ** 2
+        )
 
-        if d >= self.max_step_distance or d < self.min_step_distance:
-          self.trajectory.pop()
-          self.draw_trajectory(galy)
-          return {"galy": galy}
-        
+        if d >= 60.0 or d < 1.0:
+            self.trajectory.pop()
+            self.draw_trajectory(galy)
+            return {"galy": galy}
+
         self.final_trajectory.append(current_pt)
         self.draw_trajectory(galy)
-        return {self.outputSignal: current_pt, "galy": galy}
+        return {"trailmarker": current_pt, "galy": galy}
 
     def stop(self, data):
         """
