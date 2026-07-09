@@ -45,12 +45,12 @@ class TrailMarker(Module):
         ``outputSchema={"type": "object", "properties": {outputSignal: {}}}``
 
         .. note::
-           Die Basisklasse :class:`Module` erwartet beim Aufruf von
-           ``super().__init__`` unter anderem:
+            Die Basisklasse :class:`Module` erwartet beim Aufruf von
+            ``super().__init__`` unter anderem:
 
-           - ``inputSignals``
-           - ``outputSchema``
-           - ``name`` des Moduls
+            - ``inputSignals``
+            - ``outputSchema``
+            - ``name`` des Moduls
 
         Parameters
         ----------
@@ -87,12 +87,12 @@ class TrailMarker(Module):
           :meth:`get_nested_key` verwendet werden.
 
         .. tip::
-           Eine ``deque`` ist ideal für Trajektorien,
-           da sie effizient alte Punkte entfernt.
+            Eine ``deque`` ist ideal für Trajektorien,
+            da sie effizient alte Punkte entfernt.
 
         .. note::
-           Initialisiere hier nur Zustände und Parameter,
-           keine eigentliche Verarbeitung.
+            Initialisiere hier nur Zustände und Parameter,
+            keine eigentliche Verarbeitung.
 
         Parameters
         ----------
@@ -110,26 +110,33 @@ class TrailMarker(Module):
         self.W = get_nested_key("width", config["webcam"])
         self.H = get_nested_key("height", config["webcam"])
 
-        self.finger_index = 8  # 8 = Index
-        self.trajectory = deque(maxlen=2)
         self.lost_frames = 0
-        self.final_trajectory = deque(maxlen=250)
         self.max_lostframe = 30
-        # self.key = cv2.waitKey(1)
-        window_size = 5
+        self.finger_index = 8  # 8 = Index Finger
+
+        self.trajectory = deque(maxlen=2)
+        self.final_trajectory = deque(maxlen=250)
+
+        window_size = 3
         self.kernel_window = np.ones(window_size) / window_size
         return {}
 
     def draw_trajectory(self, galy):
-        smoothed_traj = np.convolve(
-            self.final_trajectory, self.kernel_window, mode="valid"
-        )
-        for i in range(len(smoothed_traj)):
-            if i == 0:
-                continue
-            curr_pt = self.final_trajectory[i]
-            prev_pt = self.final_trajectory[i - 1]
-            galy.line(curr_pt, prev_pt, (64, 224, 208))
+        if len(self.final_trajectory) > len(self.kernel_window):
+            traj = np.array(self.final_trajectory)
+            x = traj[:, 0]
+            y = traj[:, 1]
+
+            smoothed_x = np.convolve(x, self.kernel_window, mode="valid")
+            smoothed_y = np.convolve(y, self.kernel_window, mode="valid")
+            smoothed_traj = list(zip(smoothed_x, smoothed_y))
+
+            for i in range(len(smoothed_traj)):
+                if i == 0:
+                    continue
+                curr_pt = tuple(np.round(smoothed_traj[i]).astype(int))
+                prev_pt = tuple(np.round(smoothed_traj[i - 1]).astype(int))
+                galy.line(curr_pt, prev_pt, (64, 224, 208))
 
     def step(self, data):
         """
@@ -155,10 +162,10 @@ class TrailMarker(Module):
 
         .. tip::
           Typischer Ablauf:
-           1. Landmark extrahieren
-           2. Punkt speichern
-           3. Trajektorie aktualisieren
-           4. Linien zwischen Punkten zeichnen
+            1. Landmark extrahieren
+            2. Punkt speichern
+            3. Trajektorie aktualisieren
+            4. Linien zwischen Punkten zeichnen
 
         .. warning::
             Achte darauf, dass:
@@ -258,8 +265,8 @@ class TrailMarker(Module):
         - In vielen Fällen ist keine spezielle Bereinigung notwendig.
 
         .. note::
-           Diese Methode ist optional, kann aber sinnvoll sein,
-           wenn Zustände explizit zurückgesetzt werden sollen.
+            Diese Methode ist optional, kann aber sinnvoll sein,
+            wenn Zustände explizit zurückgesetzt werden sollen.
 
         Parameters
         ----------
