@@ -42,8 +42,8 @@ def data_labeling():
 
        .. code-block:: text
 
-           ESC → speichern
-           andere Taste → verwerfen
+          ESC → speichern
+          andere Taste → verwerfen
 
     3. Daten sichten und bereinigen
 
@@ -69,25 +69,17 @@ def data_labeling():
        Ziel ist nicht nur, dass es „funktioniert“, sondern ein sauberer und
        effizienter Workflow für Datensammlung.
 
-     Parameters
-     ----------
-     times : int
-        Wie viele Aufnahmen gemacht werden sollen.
-        Kann frei angepasst werden (z. B. Endlosschleife oder interaktive Steuerung).
+    Parameters
+    ----------
+    times : int
+       Wie viele Aufnahmen gemacht werden sollen.
+       Kann frei angepasst werden (z. B. Endlosschleife oder interaktive Steuerung).
 
-     label : str
-        Name der Geste / Klasse.
-        Kann ebenfalls frei gestaltet werden (z. B. dynamische Labels, mehrere Klassen gleichzeitig).
+    label : str
+       Name der Geste / Klasse.
+       Kann ebenfalls frei gestaltet werden (z. B. dynamische Labels, mehrere Klassen gleichzeitig).
     """
     # TO DO Input um label bei einem run wechseln zu können
-    cwd = os.getcwd()
-    data_dir = os.path.dirname(os.path.join("..", cwd))
-    folder = "recordings1"
-    data_path = os.path.join(data_dir, folder)
-
-    if not os.path.exists(data_path):
-        os.mkdir(data_path)
-
     label = input("what label do you want to record?")
     while True:
 
@@ -103,13 +95,17 @@ def data_labeling():
 
             print("Save file press 's'\nDiscard file press 'x'")
             if msvcrt.getch() == b"s":
+                cwd = os.getcwd()
+                data_dir = os.path.dirname(os.path.join("..", cwd))
+                folder = "recordings"
+                data_path = os.path.join(data_dir, folder)
 
                 random1 = np.random.randint(10000, 100000000)
                 random2 = np.random.randint(1000, 1000000)
                 filename = f"{label.title()}_{random1}_{random2}.pickle"
 
-                new_dir = os.path.join(data_path, label.title())
                 try:
+                    new_dir = os.path.join(data_path, label.title())
                     os.mkdir(new_dir)
                 except FileExistsError:
                     print("Directory already exists.")

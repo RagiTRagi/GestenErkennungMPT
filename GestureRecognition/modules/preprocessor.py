@@ -2,7 +2,6 @@ from SignalHub import GALY, get_nested_key, Module
 from collections import deque
 import numpy as np
 
-
 class Preprocessor(Module):
     """
     Modul zur Vorverarbeitung von Fingertrajektorien.
