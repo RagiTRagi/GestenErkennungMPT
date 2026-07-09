@@ -5,14 +5,15 @@ import pickle
 import shutil
 import subprocess
 
+
 def data_labeling():
-   """
-   TODO: data_labeling: Datenerfassung für Gesten (SignalHub)
-       
-   Ziel:
-   -----
-   Implementiere eine Funktion, mit der Trainingsdaten für eine bestimmte
-   Geste aufgenommen und gespeichert werden können.
+    """
+    TODO: data_labeling: Datenerfassung für Gesten (SignalHub)
+
+    Ziel:
+    -----
+    Implementiere eine Funktion, mit der Trainingsdaten für eine bestimmte
+    Geste aufgenommen und gespeichert werden können.
 
    Anforderungen / Ideen:
    ----------------------
@@ -26,10 +27,10 @@ def data_labeling():
 
    2. Interaktive Steuerung (optional)
 
-      - Implementiere eine einfache Benutzerinteraktion:
-      - Aufnahme speichern
-      - Aufnahme verwerfen
-      - Programm beenden
+       - Implementiere eine einfache Benutzerinteraktion:
+       - Aufnahme speichern
+       - Aufnahme verwerfen
+       - Programm beenden
 
    .. tip::
 
@@ -41,17 +42,17 @@ def data_labeling():
 
       .. code-block:: text
 
-         ESC → speichern
-         andere Taste → verwerfen
+          ESC → speichern
+          andere Taste → verwerfen
 
    3. Daten sichten und bereinigen
 
-      - Lade die aufgenommenen Daten
-      - Überlege:
-      - Welche Teile sind relevant?
-      - Welche Frames sind leer oder unbrauchbar?
-      - Sollten gewisse Sequenzen evtl. gar nicht benutzt werden?
-      - Entferne unnötige Anteile (z. B. keine erkannte Hand am Anfang/Ende)
+       - Lade die aufgenommenen Daten
+       - Überlege:
+       - Welche Teile sind relevant?
+       - Welche Frames sind leer oder unbrauchbar?
+       - Sollten gewisse Sequenzen evtl. gar nicht benutzt werden?
+       - Entferne unnötige Anteile (z. B. keine erkannte Hand am Anfang/Ende)
 
    4. Speicherung
 
@@ -68,58 +69,53 @@ def data_labeling():
       Ziel ist nicht nur, dass es „funktioniert“, sondern ein sauberer und
       effizienter Workflow für Datensammlung.
 
-   Parameters
-   ----------
-   times : int
-      Wie viele Aufnahmen gemacht werden sollen.
-      Kann frei angepasst werden (z. B. Endlosschleife oder interaktive Steuerung).
+    Parameters
+    ----------
+    times : int
+       Wie viele Aufnahmen gemacht werden sollen.
+       Kann frei angepasst werden (z. B. Endlosschleife oder interaktive Steuerung).
 
-   label : str
-      Name der Geste / Klasse.
-      Kann ebenfalls frei gestaltet werden (z. B. dynamische Labels, mehrere Klassen gleichzeitig).
-   """
-   # TO DO Input um label bei einem run wechseln zu können
-   label = input("what label do you want to record?")
-   while True:
-      
-      print("Click 'space' to record and 'esc' to end the program.")
-      key = msvcrt.getch()
-      if key == b'\x1b': # esc für schließen
-         break
+    label : str
+       Name der Geste / Klasse.
+       Kann ebenfalls frei gestaltet werden (z. B. dynamische Labels, mehrere Klassen gleichzeitig).
+    """
+    # TO DO Input um label bei einem run wechseln zu können
+    label = input("what label do you want to record?")
+    while True:
 
-      if key == b' ':
-         print("Recording starts..")
+        print("Click 'space' to record and 'esc' to end the program.")
+        key = msvcrt.getch()
+        if key == b"\x1b":  # esc für schließen
+            break
 
-         subprocess.run([
-            "uv",
-            "run",
-            "main.py",
-            "--mode",
-            "record"
-         ])
+        if key == b" ":
+            print("Recording starts..")
 
-         print("Save file press 's'\nDiscard file press 'x'")
-         if msvcrt.getch() == b's':
-            cwd = os.getcwd()
-            data_dir = os.path.dirname(os.path.join("..", cwd))
-            folder = "recordings"
-            data_path = os.path.join(data_dir, folder)
+            subprocess.run(["uv", "run", "main.py", "--mode", "record"])
 
-            random1 = np.random.randint(10000, 100000000)
-            random2 = np.random.randint(1000, 1000000)
-            filename = f"{label.title()}_{random1}_{random2}.pickle"
-            
-            try:
-               new_dir = os.path.join(data_path, label.title())
-               os.mkdir(new_dir)
-            except FileExistsError:
-               print("Directory already exists.")
+            print("Save file press 's'\nDiscard file press 'x'")
+            if msvcrt.getch() == b"s":
+                cwd = os.getcwd()
+                data_dir = os.path.dirname(os.path.join("..", cwd))
+                folder = "recordings"
+                data_path = os.path.join(data_dir, folder)
 
-            filepath = os.path.join(new_dir,filename)
-            source_path = "record/test.pickle"
-            shutil.copy(source_path, filepath)
-         else:
-            continue
+                random1 = np.random.randint(10000, 100000000)
+                random2 = np.random.randint(1000, 1000000)
+                filename = f"{label.title()}_{random1}_{random2}.pickle"
+
+                try:
+                    new_dir = os.path.join(data_path, label.title())
+                    os.mkdir(new_dir)
+                except FileExistsError:
+                    print("Directory already exists.")
+
+                filepath = os.path.join(new_dir, filename)
+                source_path = "record/test.pickle"
+                shutil.copy(source_path, filepath)
+            else:
+                continue
+
 
 data_labeling()
 
@@ -192,66 +188,62 @@ def dataset_building(output_path):
     ----------
     output_path : Path or str
         Zielpfad für den erzeugten Trainingsdatensatz.
-   """
-   y = []
-   X = []
-   lengths = []
+    """
+    y = []
+    X = []
+    lengths = []
 
-   dataset = {
-         "X": X,
-         "y": y,
-         "lengths" : lengths
-   }
+    dataset = {"X": X, "y": y, "lengths": lengths}
 
-   cwd = os.getcwd()
-   dir = os.path.dirname(cwd)
-   data_folder = "recordings"
-   folder_path = os.path.join(dir, data_folder)
-   labels = os.listdir(folder_path)    
+    cwd = os.getcwd()
+    dir = os.path.dirname(cwd)
+    data_folder = "recordings"
+    folder_path = os.path.join(dir, data_folder)
+    labels = os.listdir(folder_path)
 
-   for label in labels:
-       
-      label_path = os.path.join(folder_path, label)
-      samples = os.listdir(label_path)
-       
-      count = 0
-      for sample in samples:
-         count += 1
-         trailmarker_sequence = []
-         preprocessor_sequence = []
-         y.append(label)
+    for label in labels:
 
-         filename = sample
-         filepath = os.path.join(label_path, filename)
+        label_path = os.path.join(folder_path, label)
+        samples = os.listdir(label_path)
 
-         with open(filepath, "rb") as f:
-           loaded_pickle = pickle.load(f)
-          
-         preprocessor_data = []
-         preprocessor = loaded_pickle["preprocessor"]
+        count = 0
+        for sample in samples:
+            count += 1
+            trailmarker_sequence = []
+            preprocessor_sequence = []
+            y.append(label)
 
-         for sequ in preprocessor:
+            filename = sample
+            filepath = os.path.join(label_path, filename)
 
-            if sequ is None or len(sequ) == 0:
-               continue
-            
-            if sequ["preprocessor"] is None:
-               continue
+            with open(filepath, "rb") as f:
+                loaded_pickle = pickle.load(f)
 
-            data = sequ["preprocessor"]
-            preprocessor_data.append(data)
-            last_sequence = preprocessor_data[-1]
-         lengths.append(len(last_sequence))
-          
-         X.extend(last_sequence)
-       
+            preprocessor_data = []
+            preprocessor = loaded_pickle["preprocessor"]
 
-   print(dataset["lengths"])
-   print(output_path)
-   with open(output_path, "wb") as f:
-      pickle.dump(dataset, f)
-   
-   return None
+            for sequ in preprocessor:
+
+                if sequ is None or len(sequ) == 0:
+                    continue
+
+                if sequ["preprocessor"] is None:
+                    continue
+
+                data = sequ["preprocessor"]
+                preprocessor_data.append(data)
+                last_sequence = preprocessor_data[-1]
+            lengths.append(len(last_sequence))
+
+            X.extend(last_sequence)
+
+    print(dataset["lengths"])
+    print(output_path)
+    with open(output_path, "wb") as f:
+        pickle.dump(dataset, f)
+
+    return None
+
 
 cwd = os.getcwd()
 dir = os.path.dirname(cwd)

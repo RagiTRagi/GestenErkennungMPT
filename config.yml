@@ -3,6 +3,11 @@ engine:
   autoclose: True
 recorder:
   file: record/test.pickle
+  record:
+    - trailmarker
+    - preprocessor
+    - hiddenmarkov
+    - detector
   replay:
     - trailmarker
     - preprocessor

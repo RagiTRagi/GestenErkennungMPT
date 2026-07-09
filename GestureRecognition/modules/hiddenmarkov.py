@@ -1,4 +1,8 @@
+import os
+import pickle
 from SignalHub import GALY, bgr, get_nested_key, Module
+
+from GestureRecognition.hmmclassifier import HMMClassifier
 
 
 class HMMModule(Module):
@@ -70,6 +74,9 @@ class HMMModule(Module):
             name="hiddenmarkov",
         )
 
+        self.outputSignal = outputSignal
+        self.model_path = model_path
+
     def start(self, data):
         """
         Initialisierung des Moduls.
@@ -107,6 +114,22 @@ class HMMModule(Module):
         dict
             Ein leeres Dictionary.
         """
+        config = data.get("config", {})
+        mode = get_nested_key("mode", config) if isinstance(config, dict) else None
+
+        if mode == "record":
+            self.model = None
+            return {}
+
+        if not os.path.exists(self.model_path):
+            raise FileNotFoundError(
+                f"Missing HMM model file: {self.model_path}. "
+                "Train the model first or start the app in record mode."
+            )
+
+        loaded = HMMClassifier.load(self.model_path)
+        self.model = loaded.models
+        self.classes_ = loaded.classes_
         return {}
 
     def step(self, data):
@@ -169,7 +192,21 @@ class HMMModule(Module):
 
             ``return {outputSignal: result, "galy": galy}``
         """
-        return {}
+        
+        trajectory = data["preprocessor"]
+
+        if trajectory is None or self.model is None:
+            return {}
+        
+        scores = {}
+        for label, hmm in self.model.items():
+            scores[label] = hmm.score(trajectory)
+        best_label = max(scores, key=scores.get)
+
+        galy = GALY()
+        galy.putText(f"{best_label}: {scores[best_label]}", (20, 40))
+
+        return {self.outputSignal: best_label, "galy": galy}
 
     def stop(self, data):
         """
