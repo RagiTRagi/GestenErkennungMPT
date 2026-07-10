@@ -1,5 +1,9 @@
 from SignalHub import Module, get_nested_key
 from collections import deque
+import numpy as np
+from SignalHub import GALY
+from SignalHub.mode import EngineMode
+import msvcrt
 
 class TrailMarker(Module):
     """
@@ -24,7 +28,7 @@ class TrailMarker(Module):
         - Ein Modul muss definieren, **welche Signale es empfangen möchte**.
         - Diese werden über ``inputSignals`` angegeben.
         - Nur Signale, die hier subscribed werden, erscheinen später im
-          ``data`` Dictionary der Methoden :meth:`start` und :meth:`step`.
+        ``data`` Dictionary der Methoden :meth:`start` und :meth:`step`.
 
         Für dieses Modul werden unter anderem folgende Signale benötigt:
 
@@ -40,12 +44,12 @@ class TrailMarker(Module):
         ``outputSchema={"type": "object", "properties": {outputSignal: {}}}``
 
         .. note::
-           Die Basisklasse :class:`Module` erwartet beim Aufruf von
-           ``super().__init__`` unter anderem:
+            Die Basisklasse :class:`Module` erwartet beim Aufruf von
+            ``super().__init__`` unter anderem:
 
-           - ``inputSignals``
-           - ``outputSchema``
-           - ``name`` des Moduls
+            - ``inputSignals``
+            - ``outputSchema``
+            - ``name`` des Moduls
 
         Parameters
         ----------
@@ -82,12 +86,12 @@ class TrailMarker(Module):
           :meth:`get_nested_key` verwendet werden.
 
         .. tip::
-           Eine ``deque`` ist ideal für Trajektorien,
-           da sie effizient alte Punkte entfernt.
+            Eine ``deque`` ist ideal für Trajektorien,
+            da sie effizient alte Punkte entfernt.
 
         .. note::
-           Initialisiere hier nur Zustände und Parameter,
-           keine eigentliche Verarbeitung.
+            Initialisiere hier nur Zustände und Parameter,
+            keine eigentliche Verarbeitung.
 
         Parameters
         ----------
@@ -100,7 +104,38 @@ class TrailMarker(Module):
         dict
             Ein leeres Dictionary.
         """
+
+        config = data["config"]
+        self.W = get_nested_key("width", config["webcam"])
+        self.H = get_nested_key("height", config["webcam"])
+
+        self.lost_frames = 0
+        self.max_lostframe = 30
+        self.finger_index = 8  # 8 = Index Finger
+
+        self.trajectory = deque(maxlen=2)
+        self.final_trajectory = deque(maxlen=250)
+
+        window_size = 3
+        self.kernel_window = np.ones(window_size) / window_size
         return {}
+
+    def draw_trajectory(self, galy):
+        if len(self.final_trajectory) > len(self.kernel_window):
+            traj = np.array(self.final_trajectory)
+            x = traj[:, 0]
+            y = traj[:, 1]
+
+            smoothed_x = np.convolve(x, self.kernel_window, mode="valid")
+            smoothed_y = np.convolve(y, self.kernel_window, mode="valid")
+            smoothed_traj = list(zip(smoothed_x, smoothed_y))
+
+            for i in range(len(smoothed_traj)):
+                if i == 0:
+                    continue
+                curr_pt = tuple(np.round(smoothed_traj[i]).astype(int))
+                prev_pt = tuple(np.round(smoothed_traj[i - 1]).astype(int))
+                galy.line(curr_pt, prev_pt, (64, 224, 208))
 
     def step(self, data):
         """
@@ -126,10 +161,10 @@ class TrailMarker(Module):
 
         .. tip::
           Typischer Ablauf:
-           1. Landmark extrahieren
-           2. Punkt speichern
-           3. Trajektorie aktualisieren
-           4. Linien zwischen Punkten zeichnen
+            1. Landmark extrahieren
+            2. Punkt speichern
+            3. Trajektorie aktualisieren
+            4. Linien zwischen Punkten zeichnen
 
         .. warning::
             Achte darauf, dass:
@@ -155,7 +190,88 @@ class TrailMarker(Module):
 
             ``return { ..., "galy": galy}``
         """
-        return {}
+        if msvcrt.kbhit():
+            if msvcrt.getch() == b"q":
+                return ({}, EngineMode.TERMINATE)
+
+        galy = GALY()
+        detector = data["detector"]
+
+        if detector is None:
+            return {"galy": galy}
+
+        landmarks = detector.hand_landmarks  # Landmarks pro Frame
+
+        if landmarks is None or len(landmarks) == 0:
+            self.lost_frames += 1
+
+            if self.lost_frames >= self.max_lostframe:
+                self.final_trajectory.clear()
+                self.trajectory.clear()
+                self.lost_frames = 0
+                return {"galy": galy}
+
+            self.draw_trajectory(galy)
+            return {"galy": galy}
+
+        self.lost_frames = 0
+
+        finger_landmark = landmarks[0][
+            self.finger_index
+        ]  # Landmarken des Fingers extrahieren
+        pip = landmarks[0][self.finger_index - 2]
+        extended_finger = finger_landmark.y < pip.y
+
+        if not extended_finger:
+            self.draw_trajectory(galy)
+            return {"galy": galy}
+
+        px = np.clip(finger_landmark.x * self.W, 0, self.W - 1)
+        py = np.clip(finger_landmark.y * self.H, 0, self.H - 1)
+        pt = (px, py)
+        self.trajectory.append(pt)
+
+        if len(self.trajectory) == 1:
+            self.final_trajectory.append(self.trajectory[0])
+            return {"trailmarker": pt, "galy": galy}
+
+        previous_pt = self.trajectory[-2]
+        current_pt = self.trajectory[-1]
+
+        d = np.sqrt(
+            (previous_pt[0] - current_pt[0]) ** 2
+            + (previous_pt[1] - current_pt[1]) ** 2
+        )
+
+        if d >= 60.0 or d < 1.0:
+            self.trajectory.pop()
+            self.draw_trajectory(galy)
+            return {"galy": galy}
+
+        self.final_trajectory.append(current_pt)
+        self.draw_trajectory(galy)
+        return {"trailmarker": current_pt, "galy": galy}
+
+        if len(self.trajectory) == 1:
+            self.final_trajectory.append(self.trajectory[0])
+            return {"trailmarker": pt, "galy": galy}
+
+        previous_pt = self.trajectory[-2]
+        current_pt = self.trajectory[-1]
+
+        d = np.sqrt(
+            (previous_pt[0] - current_pt[0]) ** 2
+            + (previous_pt[1] - current_pt[1]) ** 2
+        )
+
+        if d >= 60.0 or d < 1.0:
+            self.trajectory.pop()
+            self.draw_trajectory(galy)
+            return {"galy": galy}
+
+        self.final_trajectory.append(current_pt)
+        self.draw_trajectory(galy)
+        return {"trailmarker": current_pt, "galy": galy}
 
     def stop(self, data):
         """
@@ -169,12 +285,12 @@ class TrailMarker(Module):
         - In vielen Fällen ist keine spezielle Bereinigung notwendig.
 
         .. note::
-           Diese Methode ist optional, kann aber sinnvoll sein,
-           wenn Zustände explizit zurückgesetzt werden sollen.
+            Diese Methode ist optional, kann aber sinnvoll sein,
+            wenn Zustände explizit zurückgesetzt werden sollen.
 
         Parameters
         ----------
         data : dict
             Letzte übergebene Daten des Frameworks.
         """
-        pass
+        return {}
