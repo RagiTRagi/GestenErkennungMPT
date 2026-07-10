@@ -89,58 +89,68 @@ def visualize_dataset(dataset_path="dataset.pkl", max_per_class=5):
     return fig
 
 
-def evaluate_classifier():
+def evaluate_classifier(model_path="data/hmm.pkl", dataset_path="dataset.pkl"):
     """
-    TODO: Evaluation deines Klassifikators
+    Evaluation des Klassifikators: Accuracy + Confusion Matrix.
 
-    Ziel:
-    -----
-    Implementiere eine sinnvolle Auswertung deines Modells auf Testdaten.
-
-    Warum ist das wichtig?
-    ----------------------
-    - Du brauchst objektive Metriken für die Qualität deines Modells
-    - Training allein reicht nicht, entscheidend ist die Generalisierung
-
-    Anforderungen / Ideen:
-    ----------------------
-    - Lade ein trainiertes Modell
-    - Lade Testdaten (getrennt vom Training!)
-    - Berechne Vorhersagen
-    - Vergleiche Vorhersagen mit Ground Truth
-
-    Metriken:
-    ---------
-    - Klassifikationsgenauigkeit (Accuracy)
-    - Confusion Matrix
-
-    .. tip::
-       Eine Confusion Matrix zeigt dir:
-         - Welche Klassen gut erkannt werden
-         - Wo dein Modell Fehler macht
-
-    .. warning::
-       Testdaten dürfen **nicht** aus dem Training stammen!
-
-    Interpretation:
-    ---------------
-    Du solltest erklären können:
-    - Welche Klassen gut funktionieren
-    - Welche Klassen verwechselt werden
-    - Warum das passieren könnte
-
-    .. note::
-       Schlechte Performance liegt oft an:
-         - schlechten Trainingsdaten
-         - zu wenigen Beispielen
-         - ungeeigneten Features
-
-    Erweiterung (optional):
-    -----------------------
-    - Weitere Metriken (Precision, Recall, F1)
-    - Vergleich verschiedener Modelle
+    Laedt das trainierte Modell (dict: label -> hmm) und einen Testdatensatz
+    ({X, y, lengths}), sagt fuer jede Sequenz eine Klasse voraus und vergleicht
+    mit den echten Labels.
     """
-    pass
+    import pickle
+    import numpy as np
+
+    # Modell und Testdaten laden
+    with open(model_path, "rb") as f:
+        model = pickle.load(f)
+    with open(dataset_path, "rb") as f:
+        dataset = pickle.load(f)
+
+    X = np.array(dataset["X"])
+    y = dataset["y"]
+    lengths = dataset["lengths"]
+
+    labels = list(model.keys())
+
+    # Für jede Sequenz die Klasse mit dem besten Score vorhersagen
+    y_true = []
+    y_pred = []
+    start = 0
+    for i in range(len(lengths)):
+        length = lengths[i]
+        seq = X[start:start + length]
+        start += length
+
+        scores = {}
+        for label in labels:
+            scores[label] = model[label].score(seq)
+        best_label = max(scores, key=scores.get)
+
+        y_true.append(y[i])
+        y_pred.append(best_label)
+
+    # Accuracy = richtige / alle
+    correct = 0
+    for t, p in zip(y_true, y_pred):
+        if t == p:
+            correct += 1
+    accuracy = correct / len(y_true)
+    print("Accuracy:", accuracy)
+
+    # Confusion Matrix (Zeile = echtes Label, Spalte = vorhergesagtes Label)
+    print("\nConfusion Matrix:")
+    print("        " + "  ".join(labels))
+    for t in labels:
+        row = []
+        for p in labels:
+            count = 0
+            for a, b in zip(y_true, y_pred):
+                if a == t and b == p:
+                    count += 1
+            row.append(count)
+        print(t, row)
+
+    return accuracy
 
 
 def replay_recordings():
