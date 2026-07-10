@@ -153,49 +153,50 @@ def evaluate_classifier(model_path="data/hmm.pkl", dataset_path="dataset.pkl"):
     return accuracy
 
 
-def replay_recordings():
+def replay_recordings(recordings_dir="recordings", pause=0.03):
     """
-    TODO: Exploration und Replay der aufgenommenen Rohdaten
+    Replay der aufgenommenen Rohdaten.
 
-    Ziel:
-    -----
-    Ermögliche es, aufgenommene Sequenzen erneut abzuspielen
-    und qualitativ zu überprüfen.
-
-    Warum ist das wichtig?
-    ----------------------
-    - Du kannst überprüfen, ob deine Aufnahmen korrekt sind
-    - Fehler in der Datenerfassung werden früh sichtbar
-    - Du entwickelst ein besseres Verständnis für deine Daten
-
-    Anforderungen / Ideen:
-    ----------------------
-    - Lade gespeicherte Aufnahmen
-    - Spiele diese erneut ab (z. B. über SignalHub / Replay-Modus)
-    - Iteriere über verschiedene Labels und Beispiele
-
-    .. tip::
-       Besonders hilfreich:
-         - Vergleiche mehrere Beispiele derselben Klasse
-         - Suche nach inkonsistenten Bewegungen
-
-    .. warning::
-       Schlechte oder inkonsistente Aufnahmen führen fast immer zu
-       schlechten Modellen. Überprüfe deine Daten frühzeitig!
-
-    Abgabe:
-    -------
-    - Du solltest zeigen können, wie deine Daten aussehen (Replay)
-    - Du solltest erklären können:
-        - Welche Beispiele gut sind
-        - Welche problematisch sind
-
-    Erweiterung (optional):
-    -----------------------
-    - Automatisches Filtern schlechter Sequenzen
-    - Kombination mit Visualisierung
+    Geht alle Aufnahmen im recordings-Ordner durch (nach Labels sortiert) und
+    spielt jede Sequenz Frame fuer Frame als wachsende Trajektorie ab. So kann
+    man pruefen, ob die Aufnahmen sauber sind.
     """
-    pass
+    import os
+    import pickle
+    import matplotlib.pyplot as plt
+
+    # alle Label-Ordner durchgehen
+    labels = os.listdir(recordings_dir)
+    for label in labels:
+        label_path = os.path.join(recordings_dir, label)
+        files = os.listdir(label_path)
+
+        # jede Aufnahme dieser Klasse abspielen
+        for file in files:
+            filepath = os.path.join(label_path, file)
+            with open(filepath, "rb") as f:
+                recording = pickle.load(f)
+
+            print("Replay:", label, "-", file)
+
+            # jede aufgenommene Frame-Trajektorie nacheinander zeichnen
+            for frame in recording["preprocessor"]:
+                if frame is None:
+                    continue
+                traj = frame["preprocessor"]
+                if traj is None or len(traj) == 0:
+                    continue
+
+                xs = [p[0] for p in traj]
+                ys = [p[1] for p in traj]
+
+                plt.clf()
+                plt.title(label + " - " + file)
+                plt.plot(xs, ys, marker=".")
+                plt.gca().invert_yaxis()  
+                plt.pause(pause) 
+
+    plt.show()
 
 
 if __name__ == "__main__":
