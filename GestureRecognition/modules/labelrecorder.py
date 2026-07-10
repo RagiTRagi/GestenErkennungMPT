@@ -40,6 +40,8 @@ class LabelRecorder(Module):
     Steuerung (Fenster muss fokussiert sein):
       - ``S``            : aktuelle Trajektorie als Sample fuer den aktuellen
                            Buchstaben speichern und Puffer zuruecksetzen
+      - ``R``            : aktuelle Zeichnung verwerfen (nichts wird geloescht,
+                           was schon gespeichert ist)
       - ``Pfeil rechts`` : naechster Buchstabe (A -> B -> ... -> Z -> A)
       - ``Pfeil links``  : vorheriger Buchstabe
       - ``Backspace``    : letztes gespeichertes Sample wieder loeschen
@@ -51,13 +53,14 @@ class LabelRecorder(Module):
 
     ALPHABET = list("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
-    def __init__(self, preprocessor, recordings_dir, start_label="A"):
+    def __init__(self, preprocessor, recordings_dir, start_label="A", trailmarker=None):
         super().__init__(
             inputSignals=["config", "preprocessor", "detector"],
             outputSchema={"type": "object", "properties": {"labeling": {}}},
             name="labelrecorder",
         )
         self.preprocessor = preprocessor
+        self.trailmarker = trailmarker
         self.recordings_dir = recordings_dir
 
         start_label = (start_label or "A").upper()
@@ -78,7 +81,7 @@ class LabelRecorder(Module):
         os.makedirs(self._label_dir(), exist_ok=True)
         print(f"[LabelRecorder] Aufnahme-Ordner: {self.recordings_dir}")
         print(f"[LabelRecorder] Start-Label: {self.label}   (Samples: {self._count()})")
-        print("[LabelRecorder] S=speichern  <-/->=Buchstabe  Backspace=undo  Esc=Ende")
+        print("[LabelRecorder] S=speichern  R=Zeichnung verwerfen  <-/->=Buchstabe  Backspace=undo  Esc=Ende")
         return {}
 
     def step(self, data):
@@ -109,6 +112,9 @@ class LabelRecorder(Module):
     def _switch(self, delta):
         self.idx = (self.idx + delta) % len(self.ALPHABET)
         os.makedirs(self._label_dir(), exist_ok=True)
+        self.preprocessor.trajectory.clear()
+        self.preprocessor.lost_count = 0
+        self._clear_trail()
         self._flash = (f"-> {self.label}", 12, (0, 255, 0))
 
     def _save(self, traj):
@@ -130,18 +136,49 @@ class LabelRecorder(Module):
         # Puffer leeren, damit der naechste Buchstabe sauber startet
         self.preprocessor.trajectory.clear()
         self.preprocessor.lost_count = 0
+        self._clear_trail()
         self._flash = (f"SAVED {self.label} #{self._count()}", 15, (0, 255, 0))
         print(f"[LabelRecorder] gespeichert: {path}")
 
+    def _clear_trail(self):
+        """Sichtbare Spur des TrailMarkers entfernen (eigener Puffer)."""
+        if self.trailmarker is not None:
+            self.trailmarker.trajectory.clear()
+            self.trailmarker.final_trajectory.clear()
+            self.trailmarker.lost_frames = 0
+
+    def _reset(self):
+        """Aktuelle Zeichnung verwerfen, ohne gespeicherte Samples anzufassen."""
+        self.preprocessor.trajectory.clear()
+        self.preprocessor.lost_count = 0
+        self._clear_trail()
+        self._flash = ("RESET", 20, (0, 200, 255))
+
     def _undo(self):
+        # Zuerst: zuletzt in *dieser* Session gespeicherte Datei (auch ueber
+        # Label-Wechsel hinweg)
         while self._saved_paths:
             path = self._saved_paths.pop()
             if os.path.exists(path):
-                os.remove(path)
-                self._flash = (f"UNDO {os.path.basename(path)}", 15, (60, 60, 255))
-                print(f"[LabelRecorder] geloescht: {path}")
+                self._delete(path)
                 return
-        self._flash = ("Nichts zum Loeschen", 15, (0, 165, 255))
+
+        # Sonst: neueste Aufnahme des aktuellen Buchstabens (z.B. aus einer
+        # frueheren Session)
+        d = self._label_dir()
+        files = []
+        if os.path.isdir(d):
+            files = [os.path.join(d, f) for f in os.listdir(d) if f.endswith(".pickle")]
+        if files:
+            self._delete(max(files, key=os.path.getmtime))
+            return
+
+        self._flash = ("Nichts zum Loeschen", 25, (0, 165, 255))
+
+    def _delete(self, path):
+        os.remove(path)
+        self._flash = (f"UNDO {os.path.basename(path)}", 25, (60, 60, 255))
+        print(f"[LabelRecorder] geloescht: {path}")
 
     def _handle_keys(self, data):
         if not _our_window_is_foreground():
@@ -156,7 +193,8 @@ class LabelRecorder(Module):
             self._prev_key[vk] = down
             return edge
 
-        save = pressed(VK_S) or pressed(VK_R)
+        save = pressed(VK_S)
+        reset = pressed(VK_R)
         left = pressed(VK_LEFT)
         right = pressed(VK_RIGHT)
         undo = pressed(VK_BACK)
@@ -167,6 +205,8 @@ class LabelRecorder(Module):
             self._switch(-1)
         if undo:
             self._undo()
+        if reset:
+            self._reset()
         if save:
             self._save(data.get("preprocessor"))
 
@@ -191,7 +231,7 @@ class LabelRecorder(Module):
             frames -= 1
             self._flash = (text, frames, color) if frames > 0 else None
 
-        galy.putText("S=save   <-/->=letter   Back=undo   Esc=quit",
+        galy.putText("S=save   R=reset drawing   <-/->=letter   Back=undo   Esc=quit",
                      (15, int(self.height) - 12), fontScale=0.5,
                      color=(255, 255, 255), thickness=1)
         return galy

@@ -2,6 +2,24 @@ from SignalHub import GALY, get_nested_key, Module
 from collections import deque
 import numpy as np
 
+
+def finger_extended(hand, tip_idx):
+    """Prueft rotationsunabhaengig, ob ein Finger gestreckt ist.
+
+    Statt ``tip.y < pip.y`` (funktioniert nur bei Finger nach oben) wird
+    verglichen, ob die Fingerspitze weiter vom Handgelenk entfernt ist als
+    das PIP-Gelenk. Das gilt bei gestrecktem Finger in jede Richtung; beim
+    Einknicken klappt die Spitze zur Handflaeche und kommt dem Handgelenk
+    naeher als das PIP-Gelenk.
+    """
+    wrist = hand[0]
+    tip = hand[tip_idx]
+    pip = hand[tip_idx - 2]
+    d_tip = np.hypot(tip.x - wrist.x, tip.y - wrist.y)
+    d_pip = np.hypot(pip.x - wrist.x, pip.y - wrist.y)
+    return d_tip > d_pip
+
+
 class Preprocessor(Module):
     """
     Modul zur Vorverarbeitung von Fingertrajektorien.
@@ -112,6 +130,11 @@ class Preprocessor(Module):
         self.min_steps = get_nested_key("preprocessor.min_steps", config)
         buffer_size = get_nested_key("preprocessor.buffer_size", config)
 
+        # Filter in normierten Bildkoordinaten (0..1):
+        # max_jump verwirft Detektor-Ausreisser, min_move Stillstands-Jitter
+        self.max_jump = get_nested_key("preprocessor.max_jump", config) or 0.10
+        self.min_move = get_nested_key("preprocessor.min_move", config) or 0.002
+
         self.trajectory = deque(maxlen=buffer_size)
         self.lost_count = 0
         return {}
@@ -177,9 +200,18 @@ class Preprocessor(Module):
         detector_result = data.get("detector")
 
         if detector_result is not None and detector_result.handedness:
-            lm = detector_result.hand_landmarks[0][self.finger_idx]
-            self.trajectory.append((lm.x, lm.y))
             self.lost_count = 0
+            tip = detector_result.hand_landmarks[0][self.finger_idx]
+            pt = (tip.x, tip.y)
+
+            # Detektor-Ausreisser und Stillstands-Jitter verwerfen
+            if self.trajectory:
+                prev = self.trajectory[-1]
+                d = np.hypot(pt[0] - prev[0], pt[1] - prev[1])
+                if d > self.max_jump or d < self.min_move:
+                    pt = None
+            if pt is not None:
+                self.trajectory.append(pt)
         else:
             self.lost_count += 1
             if self.lost_count > self.max_lost:

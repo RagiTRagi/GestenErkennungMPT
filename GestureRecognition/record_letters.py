@@ -12,6 +12,7 @@ Aufruf:
 
 Steuerung (das Kamera-Fenster muss fokussiert sein):
     S            aktuelle Trajektorie als Sample speichern (+ Puffer leeren)
+    R            aktuelle Zeichnung verwerfen (gespeicherte Samples bleiben)
     Pfeil rechts naechster Buchstabe (A -> B -> ... -> Z -> A)
     Pfeil links  vorheriger Buchstabe
     Backspace    letztes gespeichertes Sample loeschen (undo)
@@ -54,14 +55,16 @@ def main():
     start_label = known.label
 
     preprocessor = Preprocessor()
+    trailmarker = TrailMarker()
 
     modules = [
         ConfigParser(parser),
         Webcam(),
         HandDetector(),
-        TrailMarker(),
+        trailmarker,
         preprocessor,
-        LabelRecorder(preprocessor, RECORDINGS_DIR, start_label=start_label),
+        LabelRecorder(preprocessor, RECORDINGS_DIR,
+                      start_label=start_label, trailmarker=trailmarker),
     ]
 
     engine = Engine(modules=modules, signals={})

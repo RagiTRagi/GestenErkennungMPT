@@ -26,3 +26,5 @@ preprocessor:
   buffer_size: 140
   max_lost: 10
   min_steps: 15
+  max_jump: 0.10   # Punkte mit groesserem Sprung verwerfen (Detektor-Ausreisser)
+  min_move: 0.002  # Punkte ohne Bewegung verwerfen (Stillstands-Jitter)
