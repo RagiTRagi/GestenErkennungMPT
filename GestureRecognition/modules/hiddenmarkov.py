@@ -69,7 +69,7 @@ class HMMModule(Module):
             Weitere Parameter, die an :class:`Module` weitergegeben werden.
         """
         super().__init__(
-            inputSignals=["config", "preprocessor"],
+            inputSignals=["config", "preprocessor", "reset"],
             outputSchema={"type": "object", "properties": {outputSignal: {}}},
             name="hiddenmarkov",
         )
@@ -196,6 +196,10 @@ class HMMModule(Module):
             ``return {outputSignal: result, "galy": galy}``
         """
         
+        # Reset-Signal vom TrailMarker (Taste R): Prognose loeschen
+        if data.get("reset"):
+            self.last_text = None
+
         trajectory = data["preprocessor"]
 
         best_label = None

@@ -77,7 +77,7 @@ class Preprocessor(Module):
             Name des erzeugten Output-Signals.
         """
         super().__init__(
-            inputSignals=["config", "detector"],
+            inputSignals=["config", "detector", "reset"],
             outputSchema={"type": "object", "properties": {outputSignal: {}}},
             name="preprocessor",
         )
@@ -197,6 +197,11 @@ class Preprocessor(Module):
 
             ``return {outputSignal: trajectory}``
         """
+        # Reset-Signal vom TrailMarker (Taste R): Puffer leeren
+        if data.get("reset"):
+            self.trajectory.clear()
+            self.lost_count = 0
+
         detector_result = data.get("detector")
 
         if detector_result is not None and detector_result.handedness:

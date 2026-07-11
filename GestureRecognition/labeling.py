@@ -121,7 +121,29 @@ def data_labeling():
                 continue
 
 
-def dataset_building(output_path):
+def augment_sequence(seq):
+    """
+    Macht aus einer Trajektorie eine leicht veränderte Kopie:
+    kleine Drehung + etwas Rauschen. So bekommt das Modell mehr
+    Trainingsdaten und wird robuster gegen kleine Abweichungen.
+    """
+    seq = np.asarray(seq)
+
+    # kleine zufällige Drehung (ca. -8 bis +8 Grad)
+    angle = np.random.uniform(-0.15, 0.15)
+    cos_a = np.cos(angle)
+    sin_a = np.sin(angle)
+    x = seq[:, 0] * cos_a - seq[:, 1] * sin_a
+    y = seq[:, 0] * sin_a + seq[:, 1] * cos_a
+
+    new_seq = np.column_stack([x, y])
+
+    # etwas Rauschen auf jeden Punkt
+    new_seq = new_seq + np.random.normal(0, 0.02, new_seq.shape)
+    return new_seq
+
+
+def dataset_building(output_path, augment=0):
     """
     TODO: dataset_building: Trainingsdatensatz aus aufgenommenen Gesten erstellen
 
@@ -235,8 +257,14 @@ def dataset_building(output_path):
 
             X.extend(last_sequence)
 
-    print(dataset["lengths"])
-    print(output_path)
+            # Datenaugmentation: zusaetzliche leicht veraenderte Kopien
+            for _ in range(augment):
+                new_seq = augment_sequence(last_sequence)
+                y.append(label)
+                lengths.append(len(new_seq))
+                X.extend(new_seq)
+
+    print(output_path, "->", len(y), "Sequenzen,", len(set(y)), "Klassen")
     with open(output_path, "wb") as f:
         pickle.dump(dataset, f)
 
@@ -244,7 +272,7 @@ def dataset_building(output_path):
 
 
 if __name__ == "__main__":
-    # Altes, interaktives Labeling (langsam: pro Aufnahme ein neuer Prozess).
-    # Fuer schnelles Aufnehmen siehe GestureRecognition/record_letters.py
-    dataset_path = os.path.join(PROJECT_ROOT, "dataset.pkl")
-    print(dataset_building(dataset_path))
+    # normaler Datensatz (fuer die Evaluation)
+    dataset_building(os.path.join(PROJECT_ROOT, "dataset.pkl"))
+    # Datensatz mit Augmentation (fuers Training: pro Aufnahme 2 Kopien extra)
+    dataset_building(os.path.join(PROJECT_ROOT, "dataset_augmented.pkl"), augment=2)

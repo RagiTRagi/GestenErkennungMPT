@@ -193,8 +193,16 @@ class TrailMarker(Module):
             ``return { ..., "galy": galy}``
         """
         if msvcrt.kbhit():
-            if msvcrt.getch() == b"q":
+            key = msvcrt.getch()
+            if key == b"q":
                 return ({}, EngineMode.TERMINATE)
+            if key == b"r":
+                # Taste R = Reset: eigene Spur loeschen und ein Reset-Signal
+                # an die anderen Module weitergeben
+                self.trajectory.clear()
+                self.final_trajectory.clear()
+                self.lost_frames = 0
+                return {"reset": True, "galy": GALY()}
 
         galy = GALY()
         detector = data["detector"]
