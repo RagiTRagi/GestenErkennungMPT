@@ -235,39 +235,7 @@ class TrailMarker(Module):
             self.final_trajectory.append(self.trajectory[0])
             return {"trailmarker": pt, "galy": galy}
 
-        previous_pt = self.trajectory[-2]
         current_pt = self.trajectory[-1]
-
-        d = np.sqrt(
-            (previous_pt[0] - current_pt[0]) ** 2
-            + (previous_pt[1] - current_pt[1]) ** 2
-        )
-
-        if d >= 60.0 or d < 1.0:
-            self.trajectory.pop()
-            self.draw_trajectory(galy)
-            return {"galy": galy}
-
-        self.final_trajectory.append(current_pt)
-        self.draw_trajectory(galy)
-        return {"trailmarker": current_pt, "galy": galy}
-
-        if len(self.trajectory) == 1:
-            self.final_trajectory.append(self.trajectory[0])
-            return {"trailmarker": pt, "galy": galy}
-
-        previous_pt = self.trajectory[-2]
-        current_pt = self.trajectory[-1]
-
-        d = np.sqrt(
-            (previous_pt[0] - current_pt[0]) ** 2
-            + (previous_pt[1] - current_pt[1]) ** 2
-        )
-
-        if d >= 60.0 or d < 1.0:
-            self.trajectory.pop()
-            self.draw_trajectory(galy)
-            return {"galy": galy}
 
         self.final_trajectory.append(current_pt)
         self.draw_trajectory(galy)
