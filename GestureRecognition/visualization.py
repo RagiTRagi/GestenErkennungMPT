@@ -1,108 +1,20 @@
 import os
 import pickle
+import random
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-
-def _split_sequences(dataset):
-    """Zerlegt das flache ``X`` anhand von ``lengths`` in einzelne Trajektorien.
-
-    Das Datensatzformat stammt aus :func:`labeling.dataset_building` und ist
-    hmmlearn-kompatibel:
-
-    - ``X``       : aneinandergehängte Punkte aller Sequenzen, shape ``(gesamt, 2)``
-    - ``lengths`` : Anzahl Punkte pro Sequenz
-    - ``y``       : ein Label pro Sequenz
-
-    Returns
-    -------
-    list of (str, numpy.ndarray)
-        Liste aus ``(label, trajektorie)``, wobei jede Trajektorie die
-        shape ``(n_punkte, 2)`` hat.
-    """
-    X = np.asarray(dataset["X"], dtype=float)
-    lengths = list(dataset["lengths"])
-    labels = list(dataset["y"])
-
-    sequences = []
-    start = 0
-    for length, label in zip(lengths, labels):
-        sequences.append((label, X[start:start + length]))
-        start += length
-    return sequences
+from GestureRecognition.hmmclassifier import HMMClassifier
 
 
 def visualize_dataset(dataset_path="dataset.pkl", max_per_class=5):
-    """Visualisierung des eigenen Datensatzes (minimale erste Version).
-
-    Lädt den von :func:`labeling.dataset_building` erzeugten Datensatz,
-    zerlegt ihn wieder in einzelne Sequenzen und plottet pro Klasse mehrere
-    Trajektorien übereinander. So lässt sich auf einen Blick prüfen, ob die
-    Gesten klar unterscheidbar sind und ob es Ausreißer / leere Sequenzen gibt.
-
-    Parameters
-    ----------
-    dataset_path : str, optional
-        Pfad zum Datensatz-Pickle (Default ``"dataset.pkl"``).
-    max_per_class : int, optional
-        Wie viele Beispiel-Sequenzen je Klasse gezeichnet werden.
-
-    Returns
-    -------
-    matplotlib.figure.Figure
-        Die erzeugte Figur (praktisch für Tests / Weiterverarbeitung).
     """
-    if not os.path.exists(dataset_path):
-        raise FileNotFoundError(
-            f"Datensatz nicht gefunden: {dataset_path!r}. "
-            "Erst mit labeling.dataset_building erzeugen."
-        )
+    Zeigt die Trajektorien aus dem Datensatz an, ein Feld pro Buchstabe.
 
-    with open(dataset_path, "rb") as f:
-        dataset = pickle.load(f)
-
-    # Sequenzen nach Label gruppieren
-    by_label = {}
-    for label, seq in _split_sequences(dataset):
-        by_label.setdefault(label, []).append(seq)
-
-    labels = sorted(by_label)
-    if not labels:
-        raise ValueError("Datensatz enthält keine Sequenzen.")
-
-    fig, axes = plt.subplots(
-        1, len(labels), figsize=(4 * len(labels), 4), squeeze=False
-    )
-    for ax, label in zip(axes[0], labels):
-        for seq in by_label[label][:max_per_class]:
-            if len(seq) == 0:
-                continue
-            ax.plot(seq[:, 0], seq[:, 1], marker=".", markersize=2, alpha=0.7)
-        ax.set_title(f"{label}  (n={len(by_label[label])})")
-        ax.set_aspect("equal")
-        ax.invert_yaxis()  # Bildkoordinaten: y zeigt nach unten
-
-    fig.suptitle("Datensatz-Trajektorien pro Klasse")
-    fig.tight_layout()
-    plt.show()
-    return fig
-
-
-def evaluate_classifier(model_path="data/hmm.pkl", dataset_path="dataset.pkl"):
+    So sieht man schnell, ob die Buchstaben unterscheidbar sind und
+    ob es Ausreisser gibt.
     """
-    Evaluation des Klassifikators: Accuracy + Confusion Matrix.
-
-    Laedt das trainierte Modell (dict: label -> hmm) und einen Testdatensatz
-    ({X, y, lengths}), sagt fuer jede Sequenz eine Klasse voraus und vergleicht
-    mit den echten Labels.
-    """
-    import pickle
-    import numpy as np
-
-    # Modell und Testdaten laden
-    with open(model_path, "rb") as f:
-        model = pickle.load(f)
     with open(dataset_path, "rb") as f:
         dataset = pickle.load(f)
 
@@ -110,91 +22,196 @@ def evaluate_classifier(model_path="data/hmm.pkl", dataset_path="dataset.pkl"):
     y = dataset["y"]
     lengths = dataset["lengths"]
 
-    labels = list(model.keys())
-
-    # Für jede Sequenz die Klasse mit dem besten Score vorhersagen
-    y_true = []
-    y_pred = []
+    # Datensatz wieder in einzelne Sequenzen zerschneiden und
+    # nach Buchstabe gruppieren
+    sequences = {}
     start = 0
-    for i in range(len(lengths)):
-        length = lengths[i]
-        seq = X[start:start + length]
-        start += length
+    for i in range(len(y)):
+        label = y[i]
+        seq = X[start:start + lengths[i]]
+        start = start + lengths[i]
 
-        scores = {}
-        for label in labels:
-            scores[label] = model[label].score(seq)
-        best_label = max(scores, key=scores.get)
+        if label not in sequences:
+            sequences[label] = []
+        sequences[label].append(seq)
 
-        y_true.append(y[i])
-        y_pred.append(best_label)
+    labels = sorted(sequences.keys())
+
+    # Raster ausrechnen: 6 Spalten, so viele Zeilen wie noetig
+    ncols = 6
+    nrows = len(labels) // ncols
+    if len(labels) % ncols != 0:
+        nrows = nrows + 1
+
+    plt.figure(figsize=(3 * ncols, 3 * nrows))
+
+    for i in range(len(labels)):
+        label = labels[i]
+        ax = plt.subplot(nrows, ncols, i + 1)
+
+        # mehrere Beispiele uebereinander zeichnen
+        for seq in sequences[label][:max_per_class]:
+            plt.plot(seq[:, 0], seq[:, 1], marker=".", markersize=2)
+
+        plt.title(label + "  (n=" + str(len(sequences[label])) + ")")
+        ax.set_aspect("equal")
+        ax.invert_yaxis()  # Bildkoordinaten: y zeigt nach unten
+
+    plt.suptitle("Datensatz-Trajektorien pro Klasse")
+    plt.tight_layout()
+    plt.show()
+
+
+def evaluate_classifier(dataset_path="dataset.pkl", test_ratio=0.3, seed=42,
+                        n_components=10):
+    """
+    Testet den Klassifikator: Accuracy + Confusion Matrix.
+
+    Die Daten werden in Training und Test geteilt. Trainiert wird nur
+    auf den Trainingsdaten, gemessen nur auf den Testdaten (die das
+    Modell noch nie gesehen hat).
+    """
+    with open(dataset_path, "rb") as f:
+        dataset = pickle.load(f)
+
+    X = np.array(dataset["X"])
+    y = dataset["y"]
+    lengths = dataset["lengths"]
+
+    # Datensatz in einzelne Sequenzen zerschneiden
+    sequences = []
+    start = 0
+    for length in lengths:
+        sequences.append(X[start:start + length])
+        start = start + length
+
+    # Train/Test-Split: von jedem Buchstaben kommt ein Teil in den Test
+    random.seed(seed)
+    train_idx = []
+    test_idx = []
+    for label in sorted(set(y)):
+        # alle Indizes von diesem Buchstaben sammeln
+        idx = []
+        for i in range(len(y)):
+            if y[i] == label:
+                idx.append(i)
+
+        random.shuffle(idx)
+        n_test = int(len(idx) * test_ratio)
+        if n_test == 0:
+            n_test = 1
+
+        test_idx = test_idx + idx[:n_test]
+        train_idx = train_idx + idx[n_test:]
+
+    # Trainingsdaten zusammenbauen
+    X_train = []
+    y_train = []
+    len_train = []
+    for i in train_idx:
+        X_train.extend(sequences[i])
+        y_train.append(y[i])
+        len_train.append(len(sequences[i]))
+
+    # Testdaten zusammenbauen
+    X_test = []
+    y_test = []
+    len_test = []
+    for i in test_idx:
+        X_test.extend(sequences[i])
+        y_test.append(y[i])
+        len_test.append(len(sequences[i]))
+
+    # Klassifikator NUR auf den Trainingsdaten trainieren
+    clf = HMMClassifier(n_components=n_components)
+    clf.fit(np.array(X_train), y_train, len_train)
+
+    # auf den Testdaten vorhersagen
+    y_pred = clf.predict(np.array(X_test), len_test)
 
     # Accuracy = richtige / alle
     correct = 0
-    for t, p in zip(y_true, y_pred):
-        if t == p:
-            correct += 1
-    accuracy = correct / len(y_true)
-    print("Accuracy:", accuracy)
+    for i in range(len(y_test)):
+        if y_test[i] == y_pred[i]:
+            correct = correct + 1
+    accuracy = correct / len(y_test)
+    print("Test-Accuracy:", accuracy)
 
-    # Confusion Matrix (Zeile = echtes Label, Spalte = vorhergesagtes Label)
-    print("\nConfusion Matrix:")
-    print("        " + "  ".join(labels))
-    for t in labels:
-        row = []
-        for p in labels:
-            count = 0
-            for a, b in zip(y_true, y_pred):
-                if a == t and b == p:
-                    count += 1
-            row.append(count)
-        print(t, row)
+    # Confusion Matrix zaehlen (Zeile = echt, Spalte = vorhergesagt)
+    labels = list(clf.classes_)
+    cm = np.zeros((len(labels), len(labels)))
+    for i in range(len(y_test)):
+        row = labels.index(y_test[i])
+        col = labels.index(y_pred[i])
+        cm[row][col] = cm[row][col] + 1
+
+    # als Heatmap anzeigen
+    plt.figure(figsize=(9, 8))
+    plt.imshow(cm, cmap="Blues")
+    plt.xticks(range(len(labels)), labels)
+    plt.yticks(range(len(labels)), labels)
+    plt.xlabel("Vorhergesagt")
+    plt.ylabel("Echt")
+    plt.title("Confusion Matrix (Test-Accuracy = " + str(round(accuracy, 2)) + ")")
+    plt.colorbar()
+    plt.tight_layout()
+    plt.show()
 
     return accuracy
 
 
-def replay_recordings(recordings_dir="recordings", pause=0.03):
+def replay_recordings(recordings_dir="recordings", label=None, pause=0.03):
     """
-    Replay der aufgenommenen Rohdaten.
-
-    Geht alle Aufnahmen im recordings-Ordner durch (nach Labels sortiert) und
-    spielt jede Sequenz Frame fuer Frame als wachsende Trajektorie ab. So kann
-    man pruefen, ob die Aufnahmen sauber sind.
+    Spielt die aufgenommenen Buchstaben ab, Punkt fuer Punkt wie beim
+    echten Schreiben. Mit label="A" wird nur ein Buchstabe abgespielt.
     """
-    import os
-    import pickle
-    import matplotlib.pyplot as plt
+    # alle Label-Ordner durchgehen (oder nur einen bestimmten)
+    labels = sorted(os.listdir(recordings_dir))
+    if label is not None:
+        labels = [label]
 
-    # alle Label-Ordner durchgehen
-    labels = os.listdir(recordings_dir)
-    for label in labels:
-        label_path = os.path.join(recordings_dir, label)
+    for lab in labels:
+        label_path = os.path.join(recordings_dir, lab)
         files = os.listdir(label_path)
 
-        # jede Aufnahme dieser Klasse abspielen
+        # jede Aufnahme von diesem Buchstaben abspielen
         for file in files:
             filepath = os.path.join(label_path, file)
             with open(filepath, "rb") as f:
                 recording = pickle.load(f)
 
-            print("Replay:", label, "-", file)
-
-            # jede aufgenommene Frame-Trajektorie nacheinander zeichnen
+            # letzte gueltige Trajektorie aus der Aufnahme holen
+            traj = None
             for frame in recording["preprocessor"]:
-                if frame is None:
+                if frame is None or len(frame) == 0:
+                    continue
+                if frame["preprocessor"] is None:
                     continue
                 traj = frame["preprocessor"]
-                if traj is None or len(traj) == 0:
-                    continue
 
-                xs = [p[0] for p in traj]
-                ys = [p[1] for p in traj]
+            if traj is None or len(traj) == 0:
+                print("uebersprungen (leer):", lab, "-", file)
+                continue
 
+            print("Replay:", lab, "-", file)
+
+            xs = []
+            ys = []
+            for p in traj:
+                xs.append(p[0])
+                ys.append(p[1])
+
+            # Punkt fuer Punkt nachzeichnen (immer 2 Punkte mehr)
+            for i in range(2, len(xs) + 1, 2):
                 plt.clf()
-                plt.title(label + " - " + file)
-                plt.plot(xs, ys, marker=".")
-                plt.gca().invert_yaxis()  
-                plt.pause(pause) 
+                plt.title(lab + " - " + file)
+                plt.xlim(-1.1, 1.1)
+                plt.ylim(-1.1, 1.1)
+                plt.gca().invert_yaxis()  # Bildkoordinaten: y zeigt nach unten
+                plt.plot(xs[:i], ys[:i], marker=".")
+                plt.pause(pause)
+
+            plt.pause(0.5)  # fertigen Buchstaben kurz stehen lassen
 
     plt.show()
 
