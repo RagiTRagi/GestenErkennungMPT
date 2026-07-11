@@ -79,11 +79,10 @@ def data_labeling():
        Name der Geste / Klasse.
        Kann ebenfalls frei gestaltet werden (z. B. dynamische Labels, mehrere Klassen gleichzeitig).
     """
-    # TO DO Input um label bei einem run wechseln zu können
-    cwd = os.getcwd()
-    data_dir = os.path.dirname(os.path.join("..", cwd))
-    folder = "recordings1"
-    data_path = os.path.join(data_dir, folder)
+    
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    folder = "recordings"
+    data_path = os.path.join(script_dir, folder)
 
     if not os.path.exists(data_path):
         os.mkdir(data_path)
