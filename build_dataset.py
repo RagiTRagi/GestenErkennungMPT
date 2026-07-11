@@ -52,19 +52,33 @@ ordner = {
     "recordings": "dataset.pkl",              # eigene Aufnahmen (Nam)
     "recordings_alex": "dataset_alex.pkl",
     "recordings_vincent": "dataset_vincent.pkl",
+    "recordings_rafael": "dataset_rafael.pkl",
 }
 
 alle = {"X": [], "y": [], "lengths": []}
+ohne_vincent = {"X": [], "y": [], "lengths": []}
 
 for recordings_dir, output_path in ordner.items():
     if not os.path.isdir(recordings_dir):
         print("nicht gefunden, uebersprungen:", recordings_dir)
         continue
     dataset = build(recordings_dir, output_path)
+
+    # alle zusammen
     alle["X"].extend(dataset["X"])
     alle["y"].extend(dataset["y"])
     alle["lengths"].extend(dataset["lengths"])
 
+    # alle ausser Vincent
+    if recordings_dir != "recordings_vincent":
+        ohne_vincent["X"].extend(dataset["X"])
+        ohne_vincent["y"].extend(dataset["y"])
+        ohne_vincent["lengths"].extend(dataset["lengths"])
+
 with open("dataset_all.pkl", "wb") as f:
     pickle.dump(alle, f)
 print("dataset_all.pkl ->", len(alle["y"]), "Sequenzen (alle zusammen)")
+
+with open("dataset_no_vincent.pkl", "wb") as f:
+    pickle.dump(ohne_vincent, f)
+print("dataset_no_vincent.pkl ->", len(ohne_vincent["y"]), "Sequenzen (ohne Vincent)")

@@ -37,7 +37,7 @@ def visualize_dataset(dataset_path="dataset.pkl", max_per_class=5):
 
     labels = sorted(sequences.keys())
 
-    # Raster ausrechnen: 6 Spalten, so viele Zeilen wie noetig
+    # Raster ausrechnen: 6 Spalten, so viele Zeilen wie nötig
     ncols = 6
     nrows = len(labels) // ncols
     if len(labels) % ncols != 0:
@@ -49,7 +49,7 @@ def visualize_dataset(dataset_path="dataset.pkl", max_per_class=5):
         label = labels[i]
         ax = plt.subplot(nrows, ncols, i + 1)
 
-        # mehrere Beispiele uebereinander zeichnen
+        # mehrere Beispiele übereinander zeichnen
         for seq in sequences[label][:max_per_class]:
             plt.plot(seq[:, 0], seq[:, 1], marker=".", markersize=2)
 
@@ -180,7 +180,7 @@ def replay_recordings(recordings_dir="recordings", label=None, pause=0.03):
             with open(filepath, "rb") as f:
                 recording = pickle.load(f)
 
-            # letzte gueltige Trajektorie aus der Aufnahme holen
+            # letzte gültige Trajektorie aus der Aufnahme holen
             traj = None
             for frame in recording["preprocessor"]:
                 if frame is None or len(frame) == 0:
@@ -201,7 +201,7 @@ def replay_recordings(recordings_dir="recordings", label=None, pause=0.03):
                 xs.append(p[0])
                 ys.append(p[1])
 
-            # Punkt fuer Punkt nachzeichnen (immer 2 Punkte mehr)
+            # Punkt für Punkt nachzeichnen (immer 2 Punkte mehr)
             for i in range(2, len(xs) + 1, 2):
                 plt.clf()
                 plt.title(lab + " - " + file)

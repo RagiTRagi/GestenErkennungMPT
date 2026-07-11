@@ -18,6 +18,5 @@ data
 recordings/
 
 # Extra-Aufnahmen und gebaute Datensaetze
-recordings_alex/
-recordings_vincent/
+recordings_*/
 dataset*.pkl
