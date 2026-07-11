@@ -117,7 +117,29 @@ def data_labeling():
                 continue
 
 
-def dataset_building(output_path, recordings_dir="recordings"):
+def augment_sequence(seq):
+    """
+    Macht aus einer Trajektorie eine leicht veraenderte Kopie:
+    kleine Drehung + etwas Rauschen. So bekommt das Modell mehr
+    Trainingsdaten und wird robuster gegen kleine Abweichungen.
+    """
+    seq = np.asarray(seq)
+
+    # kleine zufaellige Drehung (ca. -8 bis +8 Grad)
+    angle = np.random.uniform(-0.15, 0.15)
+    cos_a = np.cos(angle)
+    sin_a = np.sin(angle)
+    x = seq[:, 0] * cos_a - seq[:, 1] * sin_a
+    y = seq[:, 0] * sin_a + seq[:, 1] * cos_a
+
+    new_seq = np.column_stack([x, y])
+
+    # etwas Rauschen auf jeden Punkt
+    new_seq = new_seq + np.random.normal(0, 0.02, new_seq.shape)
+    return new_seq
+
+
+def dataset_building(output_path, recordings_dir="recordings", augment=0):
     """
     TODO: dataset_building: Trainingsdatensatz aus aufgenommenen Gesten erstellen
 
@@ -219,6 +241,13 @@ def dataset_building(output_path, recordings_dir="recordings"):
             lengths.append(len(last_sequence))
             X.extend(last_sequence)
 
+            # Datenaugmentation: zusaetzliche leicht veraenderte Kopien
+            for _ in range(augment):
+                new_seq = augment_sequence(last_sequence)
+                y.append(label)
+                lengths.append(len(new_seq))
+                X.extend(new_seq)
+
     dataset = {"X": X, "y": y, "lengths": lengths}
     with open(output_path, "wb") as f:
         pickle.dump(dataset, f)
@@ -228,4 +257,7 @@ def dataset_building(output_path, recordings_dir="recordings"):
 
 
 if __name__ == "__main__":
+    # normaler Datensatz (fuer die Evaluation)
     dataset_building("dataset.pkl")
+    # Datensatz mit Augmentation (fuers Training: pro Aufnahme 2 Kopien extra)
+    dataset_building("dataset_augmented.pkl", augment=2)

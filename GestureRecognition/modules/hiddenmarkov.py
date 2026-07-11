@@ -220,7 +220,7 @@ class HMMModule(Module):
             }
 
             best_probability = probabilities[best_label]
-            self.last_text = f"{best_label}: {brobability:.2%}"est_p
+            self.last_text = f"{best_label}: {best_probability:.2%}"
 
         if self.last_text is None:
             return {}
