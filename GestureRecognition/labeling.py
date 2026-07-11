@@ -5,6 +5,10 @@ import pickle
 import shutil
 import subprocess
 
+# Projekt-Wurzel (eine Ebene ueber diesem Paket)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+RECORDINGS_DIR = os.path.join(PROJECT_ROOT, "recordings")
+
 
 def data_labeling():
     """
@@ -117,9 +121,6 @@ def data_labeling():
                 continue
 
 
-data_labeling()
-
-
 def dataset_building(output_path):
     """
     TODO: dataset_building: Trainingsdatensatz aus aufgenommenen Gesten erstellen
@@ -195,10 +196,7 @@ def dataset_building(output_path):
 
     dataset = {"X": X, "y": y, "lengths": lengths}
 
-    cwd = os.getcwd()
-    dir = os.path.dirname(cwd)
-    data_folder = "recordings"
-    folder_path = os.path.join(dir, data_folder)
+    folder_path = RECORDINGS_DIR
     labels = os.listdir(folder_path)
 
     for label in labels:
@@ -245,8 +243,8 @@ def dataset_building(output_path):
     return None
 
 
-cwd = os.getcwd()
-dir = os.path.dirname(cwd)
-dataset_path = os.path.join(dir, "dataset.pkl")
-
-print(dataset_building(dataset_path))
+if __name__ == "__main__":
+    # Altes, interaktives Labeling (langsam: pro Aufnahme ein neuer Prozess).
+    # Fuer schnelles Aufnehmen siehe GestureRecognition/record_letters.py
+    dataset_path = os.path.join(PROJECT_ROOT, "dataset.pkl")
+    print(dataset_building(dataset_path))

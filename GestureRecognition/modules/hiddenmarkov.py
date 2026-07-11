@@ -117,6 +117,9 @@ class HMMModule(Module):
         config = data.get("config", {})
         mode = get_nested_key("mode", config) if isinstance(config, dict) else None
 
+        # letzte Prognose merken, damit sie dauerhaft im Bild steht
+        self.last_text = None
+
         if mode == "record":
             self.model = None
             return {}
@@ -195,16 +198,25 @@ class HMMModule(Module):
         
         trajectory = data["preprocessor"]
 
-        if trajectory is None or self.model is None:
+        best_label = None
+        if trajectory is not None and self.model is not None:
+            scores = {}
+            for label, hmm in self.model.items():
+                scores[label] = hmm.score(trajectory)
+            best_label = max(scores, key=scores.get)
+            self.last_text = f"{best_label}: {scores[best_label]:.0f}"
+
+        # letzte Prognose JEDEN Frame zeichnen, nicht nur wenn gerade
+        # eine Trajektorie anliegt - sonst blitzt der Text nur kurz auf
+        if self.last_text is None:
             return {}
-        
-        scores = {}
-        for label, hmm in self.model.items():
-            scores[label] = hmm.score(trajectory)
-        best_label = max(scores, key=scores.get)
 
         galy = GALY()
-        galy.putText(f"{best_label}: {scores[best_label]}", (20, 40))
+        # Canvas ist uint8 (0..255) -> sichtbare Farbe angeben, sonst (1,1,1) = schwarz
+        galy.putText(
+            self.last_text, (20, 40),
+            fontScale=1.2, color=(0, 255, 0), thickness=2,
+        )
 
         return {self.outputSignal: best_label, "galy": galy}
 

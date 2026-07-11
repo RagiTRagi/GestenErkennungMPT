@@ -16,3 +16,8 @@ data
 #Mediapipe
 .task
 recordings/
+
+# Extra-Aufnahmen und gebaute Datensaetze
+recordings_alex/
+recordings_vincent/
+dataset*.pkl

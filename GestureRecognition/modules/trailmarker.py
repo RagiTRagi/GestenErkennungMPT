@@ -5,6 +5,8 @@ from SignalHub import GALY
 from SignalHub.mode import EngineMode
 import msvcrt
 
+from .preprocessor import finger_extended
+
 class TrailMarker(Module):
     """
     Modul zum Zeichnen einer Spur anhand der Bewegung eines Fingers.
@@ -219,8 +221,7 @@ class TrailMarker(Module):
         finger_landmark = landmarks[0][
             self.finger_index
         ]  # Landmarken des Fingers extrahieren
-        pip = landmarks[0][self.finger_index - 2]
-        extended_finger = finger_landmark.y < pip.y
+        extended_finger = finger_extended(landmarks[0], self.finger_index)
 
         if not extended_finger:
             self.draw_trajectory(galy)
