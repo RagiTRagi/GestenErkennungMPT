@@ -1,6 +1,7 @@
 import os
 import pickle
 from SignalHub import GALY, bgr, get_nested_key, Module
+import numpy as np
 
 from GestureRecognition.hmmclassifier import HMMClassifier
 
@@ -192,20 +193,41 @@ class HMMModule(Module):
 
             ``return {outputSignal: result, "galy": galy}``
         """
-        
+
         trajectory = data["preprocessor"]
 
         if trajectory is None or self.model is None:
             return {}
-        
+
         scores = {}
+        scores = {}
+
         for label, hmm in self.model.items():
             scores[label] = hmm.score(trajectory)
+
         best_label = max(scores, key=scores.get)
 
-        galy = GALY()
-        galy.putText(f"{best_label}: {scores[best_label]}", (20, 40))
+        # Scores über Softmax in relative Wahrscheinlichkeiten umwandeln
+        labels = list(scores.keys())
+        score_values = np.array([scores[label] for label in labels])
 
+        score_values = score_values - np.max(score_values)
+        exp_scores = np.exp(score_values)
+        probability_values = exp_scores / np.sum(exp_scores)
+
+        probabilities = {
+            label: float(probability)
+            for label, probability in zip(labels, probability_values)
+        }
+
+        best_probability = probabilities[best_label]
+        # for label, hmm in self.model.items():
+        #    scores[label] = hmm.score(trajectory)
+        # best_label = max(scores, key=scores.get)
+
+        galy = GALY()
+        # galy.putText(f"{best_label}: {scores[best_label]}", (20, 40))
+        galy.putText(f"{best_label}: {best_probability:.2%}", (20, 40))
         return {self.outputSignal: best_label, "galy": galy}
 
     def stop(self, data):
