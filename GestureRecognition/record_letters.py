@@ -11,6 +11,8 @@ Aufruf:
     uv run GestureRecognition/record_letters.py --label M   (Startbuchstabe)
     uv run GestureRecognition/record_letters.py --review    (Aufnahmen durchschauen/loeschen)
     uv run GestureRecognition/record_letters.py --review --label M
+    uv run GestureRecognition/record_letters.py --review --dir recordings_alex
+    uv run GestureRecognition/record_letters.py --review --dir recordings_rafael
 
 Steuerung Aufnahme (das Kamera-Fenster muss fokussiert sein):
     S            aktuelle Trajektorie als Sample speichern (+ Puffer leeren)
@@ -158,6 +160,8 @@ def main():
                         help="Buchstabe, mit dem gestartet wird (A-Z)")
     parser.add_argument("--review", action="store_true",
                         help="Aufnahmen durchschauen und loeschen statt aufnehmen")
+    parser.add_argument("--dir", action="store", default="recordings",
+                        help="Welcher recordings-Ordner (z.B. recordings_alex)")
     parser.add_argument("--webcam.width", required=False)
 
     # Modelldatei relativ zur Projekt-Wurzel finden, egal von wo gestartet wird
@@ -168,7 +172,8 @@ def main():
     start_label = known.label.upper()
 
     if known.review:
-        review_recordings(start_label)
+        review_dir = os.path.join(PROJECT_ROOT, known.dir)
+        review_recordings(start_label, recordings_dir=review_dir)
         return
 
     preprocessor = Preprocessor()

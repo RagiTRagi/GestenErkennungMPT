@@ -20,3 +20,4 @@ recordings/
 # Extra-Aufnahmen und gebaute Datensaetze
 recordings_*/
 dataset*.pkl
+recordings.zip
