@@ -218,4 +218,3 @@ def replay_recordings(recordings_dir="recordings", label=None, pause=0.03):
 
 if __name__ == "__main__":
     visualize_dataset()
-    evaluate_classifier()
