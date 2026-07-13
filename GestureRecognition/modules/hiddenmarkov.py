@@ -78,6 +78,17 @@ class HMMModule(Module):
         self.outputSignal = outputSignal
         self.model_path = model_path
 
+    def _draw_prediction_overlay(self, galy, best_label, best_probability):
+        x = 24
+        y = 52
+
+        title = str(best_label)
+        subtitle = f"Confidence: {best_probability:.1%}"
+
+        galy.putText(title, (x, y), fontScale=2.2, color=bgr("#fefcf7"), thickness=5)
+
+        galy.putText(subtitle, (x, y + 42), fontScale=1.1, color=bgr("#ff500b"), thickness=3)
+
     def start(self, data):
         """
         Initialisierung des Moduls.
@@ -226,8 +237,7 @@ class HMMModule(Module):
         # best_label = max(scores, key=scores.get)
 
         galy = GALY()
-        # galy.putText(f"{best_label}: {scores[best_label]}", (20, 40))
-        galy.putText(f"{best_label}: {best_probability:.2%}", (20, 40))
+        self._draw_prediction_overlay(galy, best_label, best_probability)
         return {self.outputSignal: best_label, "galy": galy}
 
     def stop(self, data):
