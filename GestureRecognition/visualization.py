@@ -5,7 +5,7 @@ import random
 import numpy as np
 import matplotlib.pyplot as plt
 
-from GestureRecognition.hmmclassifier import HMMClassifier
+from hmmclassifier import HMMClassifier
 
 
 def visualize_dataset(dataset_path="dataset.pkl", max_per_class=5):
@@ -218,3 +218,4 @@ def replay_recordings(recordings_dir="recordings", label=None, pause=0.03):
 
 if __name__ == "__main__":
     visualize_dataset()
+    evaluate_classifier()

@@ -237,7 +237,8 @@ class HMMModule(Module):
             return {}
 
         galy = GALY()
-        self._draw_prediction_overlay(galy, best_label, best_probability)
+        if best_label is not None and best_probability is not None:
+            self._draw_prediction_overlay(galy, best_label, best_probability)
         return {self.outputSignal: best_label, "galy": galy}
 
     def stop(self, data):
