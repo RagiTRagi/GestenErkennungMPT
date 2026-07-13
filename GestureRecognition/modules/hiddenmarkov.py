@@ -129,6 +129,9 @@ class HMMModule(Module):
         config = data.get("config", {})
         mode = get_nested_key("mode", config) if isinstance(config, dict) else None
 
+        # letzte Prognose merken, damit sie dauerhaft im Bild steht
+        self.last_text = None
+
         if mode == "record":
             self.model = None
             return {}
@@ -207,34 +210,31 @@ class HMMModule(Module):
 
         trajectory = data["preprocessor"]
 
-        if trajectory is None or self.model is None:
+        best_label = None
+        if trajectory is not None and self.model is not None:
+            scores = {}
+            for label, hmm in self.model.items():
+                scores[label] = hmm.score(trajectory)
+
+            best_label = max(scores, key=scores.get)
+
+            labels = list(scores.keys())
+            score_values = np.array([scores[label] for label in labels])
+
+            score_values = score_values - np.max(score_values)
+            exp_scores = np.exp(score_values)
+            probability_values = exp_scores / np.sum(exp_scores)
+
+            probabilities = {
+                label: float(probability)
+                for label, probability in zip(labels, probability_values)
+            }
+
+            best_probability = probabilities[best_label]
+            self.last_text = f"{best_label}: {best_probability:.2%}"
+
+        if self.last_text is None:
             return {}
-
-        scores = {}
-        scores = {}
-
-        for label, hmm in self.model.items():
-            scores[label] = hmm.score(trajectory)
-
-        best_label = max(scores, key=scores.get)
-
-        # Scores über Softmax in relative Wahrscheinlichkeiten umwandeln
-        labels = list(scores.keys())
-        score_values = np.array([scores[label] for label in labels])
-
-        score_values = score_values - np.max(score_values)
-        exp_scores = np.exp(score_values)
-        probability_values = exp_scores / np.sum(exp_scores)
-
-        probabilities = {
-            label: float(probability)
-            for label, probability in zip(labels, probability_values)
-        }
-
-        best_probability = probabilities[best_label]
-        # for label, hmm in self.model.items():
-        #    scores[label] = hmm.score(trajectory)
-        # best_label = max(scores, key=scores.get)
 
         galy = GALY()
         self._draw_prediction_overlay(galy, best_label, best_probability)
