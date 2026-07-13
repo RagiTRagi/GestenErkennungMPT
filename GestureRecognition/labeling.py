@@ -117,10 +117,29 @@ def data_labeling():
                 continue
 
 
-data_labeling()
+def augment_sequence(seq):
+    """
+    Macht aus einer Trajektorie eine leicht veraenderte Kopie:
+    kleine Drehung + etwas Rauschen. So bekommt das Modell mehr
+    Trainingsdaten und wird robuster gegen kleine Abweichungen.
+    """
+    seq = np.asarray(seq)
+
+    # kleine zufaellige Drehung (ca. -8 bis +8 Grad)
+    angle = np.random.uniform(-0.15, 0.15)
+    cos_a = np.cos(angle)
+    sin_a = np.sin(angle)
+    x = seq[:, 0] * cos_a - seq[:, 1] * sin_a
+    y = seq[:, 0] * sin_a + seq[:, 1] * cos_a
+
+    new_seq = np.column_stack([x, y])
+
+    # etwas Rauschen auf jeden Punkt
+    new_seq = new_seq + np.random.normal(0, 0.02, new_seq.shape)
+    return new_seq
 
 
-def dataset_building(output_path):
+def dataset_building(output_path, recordings_dir="recordings", augment=0):
     """
     TODO: dataset_building: Trainingsdatensatz aus aufgenommenen Gesten erstellen
 
@@ -189,64 +208,56 @@ def dataset_building(output_path):
     output_path : Path or str
         Zielpfad für den erzeugten Trainingsdatensatz.
     """
-    y = []
     X = []
+    y = []
     lengths = []
 
-    dataset = {"X": X, "y": y, "lengths": lengths}
+    for label in sorted(os.listdir(recordings_dir)):
+        label_path = os.path.join(recordings_dir, label)
+        if not os.path.isdir(label_path):
+            continue
 
-    cwd = os.getcwd()
-    dir = os.path.dirname(cwd)
-    data_folder = "recordings"
-    folder_path = os.path.join(dir, data_folder)
-    labels = os.listdir(folder_path)
-
-    for label in labels:
-
-        label_path = os.path.join(folder_path, label)
-        samples = os.listdir(label_path)
-
-        count = 0
-        for sample in samples:
-            count += 1
-            trailmarker_sequence = []
-            preprocessor_sequence = []
-            y.append(label)
-
-            filename = sample
-            filepath = os.path.join(label_path, filename)
-
+        for sample in os.listdir(label_path):
+            filepath = os.path.join(label_path, sample)
             with open(filepath, "rb") as f:
-                loaded_pickle = pickle.load(f)
+                recording = pickle.load(f)
 
-            preprocessor_data = []
-            preprocessor = loaded_pickle["preprocessor"]
-
-            for sequ in preprocessor:
-
-                if sequ is None or len(sequ) == 0:
+            
+            last_sequence = None
+            for frame in recording["preprocessor"]:
+                if frame is None or len(frame) == 0:
                     continue
-
-                if sequ["preprocessor"] is None:
+                if frame["preprocessor"] is None:
                     continue
+                last_sequence = frame["preprocessor"]
 
-                data = sequ["preprocessor"]
-                preprocessor_data.append(data)
-                last_sequence = preprocessor_data[-1]
+            # leere Aufnahmen ueberspringen
+            if last_sequence is None or len(last_sequence) == 0:
+                print("uebersprungen (leer):", label, sample)
+                continue
+
+            last_sequence = np.asarray(last_sequence)
+            y.append(label)
             lengths.append(len(last_sequence))
-
             X.extend(last_sequence)
 
-    print(dataset["lengths"])
-    print(output_path)
+            # Datenaugmentation: zusaetzliche leicht veraenderte Kopien
+            for _ in range(augment):
+                new_seq = augment_sequence(last_sequence)
+                y.append(label)
+                lengths.append(len(new_seq))
+                X.extend(new_seq)
+
+    dataset = {"X": X, "y": y, "lengths": lengths}
     with open(output_path, "wb") as f:
         pickle.dump(dataset, f)
 
-    return None
+    print(output_path, "->", len(y), "Sequenzen,", len(set(y)), "Klassen")
+    return dataset
 
 
-cwd = os.getcwd()
-dir = os.path.dirname(cwd)
-dataset_path = os.path.join(dir, "dataset.pkl")
-
-print(dataset_building(dataset_path))
+if __name__ == "__main__":
+    # normaler Datensatz (fuer die Evaluation)
+    dataset_building("dataset.pkl")
+    # Datensatz mit Augmentation (fuers Training: pro Aufnahme 2 Kopien extra)
+    dataset_building("dataset_augmented.pkl", augment=2)

@@ -56,7 +56,8 @@ class HMMClassifier:
     - Vergleiche verschiedene Modellkonfigurationen
 
     """
-    def __init__(self, n_components=3, covariance_type="diag"):
+
+    def __init__(self, n_components=10, covariance_type="diag"):
         self.n_components = n_components
         self.covariance_type = covariance_type
         self.models = {}  
@@ -291,3 +292,30 @@ class HMMClassifier:
         instance.models = state["models"]
         instance.classes_ = state["classes_"]
         return instance
+
+
+if __name__ == "__main__":
+    # Training: Datensatz laden, ein HMM pro Buchstabe trainieren und
+    # das Modell für die Live-Demo speichern.
+    #
+    # Aufruf:
+    #   uv run GestureRecognition/hmmclassifier.py                  -> dataset.pkl
+    #   uv run GestureRecognition/hmmclassifier.py dataset_all.pkl  -> anderer Datensatz
+    import os
+    import sys
+
+    dataset_path = "dataset.pkl"
+    if len(sys.argv) > 1:
+        dataset_path = sys.argv[1]
+
+    print("Trainiere mit:", dataset_path)
+    with open(dataset_path, "rb") as f:
+        dataset = pickle.load(f)
+
+    clf = HMMClassifier()
+    clf.fit(np.array(dataset["X"]), dataset["y"], dataset["lengths"])
+    print("Trainierte Klassen:", list(clf.classes_))
+
+    os.makedirs("data", exist_ok=True)
+    clf.save("data/hmm.pkl")
+    print("Modell gespeichert unter data/hmm.pkl")
