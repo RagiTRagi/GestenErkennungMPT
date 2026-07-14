@@ -29,10 +29,11 @@ def data_labeling():
     ``record/test.pickle`` speichern.
 
     Beim Speichern wird die Aufnahme in einen label-spezifischen Unterordner
-    innerhalb des Verzeichnisses ``recordings`` kopiert. Existiert der
-    Unterordner noch nicht, wird er automatisch erstellt. Der Dateiname
-    enthält das Klassenlabel sowie zwei zufällig erzeugte Zahlen, damit
-    mehrere Aufnahmen derselben Geste nicht überschrieben werden.
+    im Verzeichnis ``recordings`` des Projektstamms kopiert. Existiert der
+    label-spezifische Unterordner noch nicht, wird er automatisch erstellt.
+    Der Dateiname enthält das Klassenlabel sowie zwei zufällig erzeugte
+    Zahlen, damit mehrere Aufnahmen derselben Geste nicht überschrieben
+    werden.
 
     Returns
     -------
@@ -88,9 +89,9 @@ def data_labeling():
             print("Save file press 's'\nDiscard file press 'x'")
             if msvcrt.getch() == b"s":
 
-                folder = "recordings"
                 script_dir = os.path.dirname(os.path.abspath(__file__))
-                data_path = os.path.join(script_dir, folder)
+                project_dir = os.path.dirname(script_dir)
+                data_path = os.path.join(project_dir, "recordings")
 
                 new_dir = os.path.join(data_path, label.title())
                 os.makedirs(new_dir, exist_ok=True)
@@ -100,8 +101,9 @@ def data_labeling():
                 filename = f"{label.title()}_{random1}_{random2}.pickle"
 
                 filepath = os.path.join(new_dir, filename)
-                source_path = "record/test.pickle"
+                source_path = os.path.join(project_dir, "record", "test.pickle")
                 shutil.copy(source_path, filepath)
+                print("Aufnahme gespeichert unter:", filepath)
             else:
                 continue
 
