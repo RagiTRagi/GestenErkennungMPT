@@ -12,6 +12,20 @@ dependencies = [
     "tqdm>=4.67.3",
 ]
 
+[project.scripts]
+main = "main:main"
+hmm-train = "GestureRecognition.hmmclassifier:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["main"]
+
+[tool.setuptools.packages.find]
+include = ["GestureRecognition*"]
+
 [tool.uv.sources]
 signalhub = { git = "https://github.com/jaboll-ai/SignalHub.git", rev = "pyproject" }
 

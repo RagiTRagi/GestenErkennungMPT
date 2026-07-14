@@ -1,8 +1,10 @@
 from hmmlearn import hmm
+import argparse
+import json
 import numpy as np
-import pickle, os, sys, warnings, optuna
+import pickle, os, warnings, optuna
 from sklearn.metrics import accuracy_score
-from MPT_utils import augment_sequence, split_hmm_sequences_3way, plot_evaluation_results
+from .MPT_utils import augment_sequence, split_hmm_sequences_3way, plot_evaluation_results
 
 class HMMClassifier:
     """
@@ -472,6 +474,88 @@ class HMMClassifier:
         return instance
 
 
+def save_best_parameters(params, filepath="data/hmm_best_params.json",
+                         validation_accuracy=None):
+    """Speichert die besten HMM-Hyperparameter als JSON-Datei.
+
+    Parameters
+    ----------
+    params : dict
+        Optuna-Parameter mit ``n_components`` und ``covariance_type``.
+    filepath : str or path-like, optional
+        Zielpfad der JSON-Datei.
+    validation_accuracy : float, optional
+        Beste während der Optuna-Studie erreichte Validation Accuracy. Sie
+        wird nur zur Dokumentation gespeichert und nicht fürs Training
+        benötigt.
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    KeyError
+        Wenn einer der benötigten Hyperparameter fehlt.
+    """
+    saved_params = {
+        "n_components": int(params["n_components"]),
+        "covariance_type": str(params["covariance_type"]),
+    }
+    if validation_accuracy is not None:
+        saved_params["validation_accuracy"] = float(validation_accuracy)
+
+    directory = os.path.dirname(os.fspath(filepath))
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+
+    with open(filepath, "w", encoding="utf-8") as file:
+        json.dump(saved_params, file, indent=2)
+
+
+def train_with_best_parameters(X, y, lengths,
+                               params_path="data/hmm_best_params.json",
+                               model_path="data/hmm.pkl"):
+    """Trainiert ein HMM direkt mit zuvor gespeicherten Parametern.
+
+    Die Funktion führt keine Optuna-Studie durch. Sie lädt die von
+    :func:`save_best_parameters` erzeugte JSON-Datei, trainiert einmalig einen
+    :class:`HMMClassifier` und speichert das fertige Modell.
+
+    Parameters
+    ----------
+    X : array-like of shape (sum(lengths), n_features)
+        Verkettete Beobachtungen aller Trainingssequenzen.
+    y : array-like of shape (n_sequences,)
+        Klassenlabel der Trainingssequenzen.
+    lengths : array-like of shape (n_sequences,)
+        Länge jeder in ``X`` enthaltenen Sequenz.
+    params_path : str or path-like, optional
+        Pfad zur JSON-Datei mit den besten Hyperparametern.
+    model_path : str or path-like, optional
+        Zielpfad für das trainierte Modell.
+
+    Returns
+    -------
+    HMMClassifier
+        Das trainierte und gespeicherte Modell.
+    """
+    with open(params_path, "r", encoding="utf-8") as file:
+        params = json.load(file)
+
+    classifier = HMMClassifier(
+        n_components=int(params["n_components"]),
+        covariance_type=params["covariance_type"],
+    )
+    classifier.fit(X, y, lengths)
+
+    directory = os.path.dirname(os.fspath(model_path))
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    classifier.save(model_path)
+    return classifier
+
+
 def main():
 
     """
@@ -498,7 +582,12 @@ def main():
     Standardmäßig wird die Datei ``dataset.pkl`` verwendet. Alternativ kann
     ein anderer Dateipfad als erstes Kommandozeilenargument angegeben werden::
 
-        python hmm_classifier.py eigener_datensatz.pkl
+        python -m GestureRecognition.hmmclassifier eigener_datensatz.pkl
+
+    Mit ``--quick`` wird die Optuna-Studie übersprungen und direkt mit den
+    Parametern aus ``data/hmm_best_params.json`` trainiert::
+
+        python -m GestureRecognition.hmmclassifier --quick
 
     Beim Training wird folgender Ablauf durchgeführt:
 
@@ -517,9 +606,25 @@ def main():
     Evaluation unabhängig von der Modellauswahl.
     """
 
-    dataset_path = "dataset.pkl"
-    if len(sys.argv) > 1:
-        dataset_path = sys.argv[1]
+    parser = argparse.ArgumentParser(description=main.__doc__)
+    parser.add_argument("dataset_path", nargs="?", default="dataset.pkl")
+    parser.add_argument(
+        "--quick",
+        action="store_true",
+        help="Überspringt Optuna und verwendet die gespeicherten Parameter.",
+    )
+    parser.add_argument(
+        "--params-path",
+        default="data/hmm_best_params.json",
+        help="Pfad zur JSON-Datei mit den besten HMM-Parametern.",
+    )
+    parser.add_argument(
+        "--model-path",
+        default="data/hmm.pkl",
+        help="Zielpfad des trainierten HMM-Klassifikators.",
+    )
+    args = parser.parse_args()
+    dataset_path = args.dataset_path
 
     print("Lade Daten:", dataset_path)
     with open(dataset_path, "rb") as f:
@@ -562,6 +667,23 @@ def main():
     lengths_train = lengths_train_augmented
 
     print(f"Training nach Augmentation: {len(lengths_train)} Sequenzen")
+
+    X_train_val = np.vstack([X_train, X_val])
+    y_train_val = np.concatenate([y_train, y_val])
+    lengths_train_val = lengths_train + lengths_val
+
+    if args.quick:
+        print("\nSchnelltraining mit gespeicherten Parametern...")
+        best_clf = train_with_best_parameters(
+            X_train_val,
+            y_train_val,
+            lengths_train_val,
+            params_path=args.params_path,
+            model_path=args.model_path,
+        )
+        plot_evaluation_results(best_clf, X_test, y_test, lengths_test)
+        print(f"Modell gespeichert unter {args.model_path}")
+        return
 
     def objective(trial):
 
@@ -614,22 +736,23 @@ def main():
     print("Beste Parameter:", study.best_params)
     print(f"Beste Validation Accuracy: {study.best_value * 100:.2f}%")
 
-    print("\nTrainiere finales Modell mit besten Parametern...")
-    X_train_val = np.vstack([X_train, X_val])
-    y_train_val = np.concatenate([y_train, y_val])
-    lengths_train_val = lengths_train + lengths_val
-
-    best_clf = HMMClassifier(
-        n_components=study.best_params["n_components"],
-        covariance_type=study.best_params["covariance_type"]
+    save_best_parameters(
+        study.best_params,
+        filepath=args.params_path,
+        validation_accuracy=study.best_value,
     )
-    best_clf.fit(X_train_val, y_train_val, lengths_train_val)
+    print(f"Beste Parameter gespeichert unter {args.params_path}")
+
+    best_clf = train_with_best_parameters(
+        X_train_val,
+        y_train_val,
+        lengths_train_val,
+        params_path=args.params_path,
+        model_path=args.model_path,
+    )
 
     plot_evaluation_results(best_clf, X_test, y_test, lengths_test)
-
-    os.makedirs("data", exist_ok=True)
-    best_clf.save("data/hmm.pkl")
-    print("Modell gespeichert unter data/hmm.pkl")
+    print(f"Modell gespeichert unter {args.model_path}")
 
 if __name__ == "__main__":
     main()

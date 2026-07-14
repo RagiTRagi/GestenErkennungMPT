@@ -4,7 +4,8 @@ import numpy as np
 import pickle
 import shutil
 import subprocess
-from MPT_utils import augment_sequence
+from .MPT_utils import augment_sequence
+
 
 
 def data_labeling():

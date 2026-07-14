@@ -340,7 +340,7 @@ wheels = [
 [[package]]
 name = "gesturerecognition"
 version = "0.1.1"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "hmmlearn" },
     { name = "mediapipe" },
