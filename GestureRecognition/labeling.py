@@ -9,78 +9,68 @@ from MPT_utils import augment_sequence
 
 def data_labeling():
     """
-     TODO: data_labeling: Datenerfassung für Gesten (SignalHub)
+    Nimmt Gestendaten über SignalHub auf und speichert ausgewählte Aufnahmen.
 
-     Ziel:
-     -----
-     Implementiere eine Funktion, mit der Trainingsdaten für eine bestimmte
-     Geste aufgenommen und gespeichert werden können.
+    Zu Beginn wird der Name der aufzunehmenden Geste über eine
+    Benutzereingabe abgefragt. Dieser Name wird als Klassenlabel und als
+    Name des zugehörigen Unterordners verwendet.
 
-    Anforderungen / Ideen:
-    ----------------------
+    Anschließend wartet die Funktion auf Tastatureingaben:
 
-    1. Aufnahme starten
+    - Mit der Leertaste wird eine neue Aufnahme gestartet.
+    - Mit der Escape-Taste wird die Datenerfassung beendet.
+    - Nach einer Aufnahme kann diese mit ``s`` gespeichert werden.
+    - Mit einer anderen Taste, beispielsweise ``x``, wird die Aufnahme
+      verworfen.
 
-       - Starte SignalHub über einen Subprocess
-       - Übergib einen Dateipfad für die Aufnahme
-       - Überlege, welche Module aufgenommen werden sollen
-       - Nimm entsprechende Änderungen in der ``config.yaml`` vor
+    Für jede Aufnahme wird SignalHub über einen Subprocess im
+    Aufnahmemodus gestartet. SignalHub muss die erzeugten Daten unter
+    ``record/test.pickle`` speichern.
 
-    2. Interaktive Steuerung (optional)
+    Beim Speichern wird die Aufnahme in einen label-spezifischen Unterordner
+    innerhalb des Verzeichnisses ``recordings`` kopiert. Existiert der
+    Unterordner noch nicht, wird er automatisch erstellt. Der Dateiname
+    enthält das Klassenlabel sowie zwei zufällig erzeugte Zahlen, damit
+    mehrere Aufnahmen derselben Geste nicht überschrieben werden.
 
-        - Implementiere eine einfache Benutzerinteraktion:
-        - Aufnahme speichern
-        - Aufnahme verwerfen
-        - Programm beenden
+    Returns
+    -------
+    None
+        Die Funktion gibt keinen Wert zurück. Gespeicherte Aufnahmen werden
+        als Pickle-Dateien im Aufnahmeverzeichnis abgelegt.
 
-    .. tip::
+    Notes
+    -----
+    Die Funktion ist für Windows ausgelegt, da Tastatureingaben mit
+    ``msvcrt.getch`` gelesen werden.
 
-       Die Funktion ``getch()`` (Aus dem Modul Linux :mod:`getch` oder bei Windows :mod:`msvcrt`) ist sehr hilfreich, um einzelne Tastendrücke
-       direkt auszulesen (ohne Enter). Damit kannst du dir ein schnelles
-       Labeling-Interface bauen.
+    SignalHub wird mit folgendem Befehl gestartet:
 
-       Beispiel:
+    ``uv run main.py --mode record``
 
-       .. code-block:: text
+    Die erwartete Ordnerstruktur nach dem Speichern ist beispielsweise:
 
-          ESC → speichern
-          andere Taste → verwerfen
+    ``recordings/Herz/Herz_123456_7890.pickle``
 
-    3. Daten sichten und bereinigen
+    Die Funktion speichert die von SignalHub erzeugte Datei nicht direkt,
+    sondern kopiert die temporäre Aufnahme aus ``record/test.pickle`` in
+    das entsprechende Label-Verzeichnis.
 
-        - Lade die aufgenommenen Daten
-        - Überlege:
-        - Welche Teile sind relevant?
-        - Welche Frames sind leer oder unbrauchbar?
-        - Sollten gewisse Sequenzen evtl. gar nicht benutzt werden?
-        - Entferne unnötige Anteile (z. B. keine erkannte Hand am Anfang/Ende)
+    Raises
+    ------
+    FileNotFoundError
+        Wenn ``uv``, ``main.py`` oder die temporäre Aufnahme
+        ``record/test.pickle`` nicht gefunden wird.
 
-    4. Speicherung
+    PermissionError
+        Wenn das Aufnahmeverzeichnis nicht erstellt oder die Datei nicht
+        dorthin kopiert werden darf.
 
-       - Speichere Daten strukturiert nach Labels (z. B. Ordnerstruktur)
-       - Jede Aufnahme sollte einzeln gespeichert werden
-
-    .. note::
-
-       Die konkrete Umsetzung (Dateiformat, Struktur, Ablauf) ist bewusst offen.
-       Entwickle ein System, das für dich sinnvoll ist und sich gut weiterverarbeiten lässt.
-
-    .. warning::
-
-       Ziel ist nicht nur, dass es „funktioniert“, sondern ein sauberer und
-       effizienter Workflow für Datensammlung.
-
-    Parameters
-    ----------
-    times : int
-       Wie viele Aufnahmen gemacht werden sollen.
-       Kann frei angepasst werden (z. B. Endlosschleife oder interaktive Steuerung).
-
-    label : str
-       Name der Geste / Klasse.
-       Kann ebenfalls frei gestaltet werden (z. B. dynamische Labels, mehrere Klassen gleichzeitig).
+    OSError
+        Wenn beim Erstellen des Verzeichnisses, beim Starten des
+        Subprocesses oder beim Kopieren der Aufnahme ein Betriebssystemfehler
+        auftritt.
     """
-    # TO DO Input um label bei einem run wechseln zu können
     label = input("what label do you want to record?")
     while True:
 
@@ -119,72 +109,81 @@ def data_labeling():
 
 def dataset_building(output_path, recordings_dir="recordings", augment=0):
     """
-    TODO: dataset_building: Trainingsdatensatz aus aufgenommenen Gesten erstellen
+    Erstellt einen HMM-Trainingsdatensatz aus gespeicherten Gestenaufnahmen.
 
-    Ziel:
-    -----
-    Implementiere eine Funktion, die alle aufgenommenen Daten lädt,
-    verarbeitet und in eine Form bringt, die von eurem
-    Hidden-Markov-Modell (HMM) Classifier verwendet werden kann.
+    Die Funktion durchsucht den angegebenen Aufnahmeordner nach
+    Unterordnern. Jeder Unterordner wird als eigenes Klassenlabel
+    interpretiert. Die darin enthaltenen Pickle-Dateien werden geladen und
+    nach gültigen Preprocessor-Sequenzen durchsucht.
 
-    Anforderungen / Ideen:
-    ----------------------
+    Aus jeder Aufnahme wird die letzte vorhandene und nicht leere
+    Preprocessor-Sequenz übernommen. Alle Sequenzen werden anschließend
+    hintereinander in einer gemeinsamen Feature-Liste gespeichert. Die
+    ursprünglichen Sequenzlängen werden separat festgehalten, damit das
+    Hidden-Markov-Modell die einzelnen Gesten trotz der zusammengeführten
+    Daten voneinander unterscheiden kann.
 
-    1. Daten laden
-
-       - Durchsuche deinen Trainingsdaten-Ordner
-       - Organisiere Daten nach Labels
-
-    2. Feature-Extraktion / Preprocessing
-
-       - Überlege:
-         - Welche Features braucht dein Modell?
-         - Wie transformierst du die Rohdaten sinnvoll?
-       - Wende eine konsistente Verarbeitung auf alle Sequenzen an
-
-    3. Umgang mit Sequenzen
-
-       - Daten sind zeitliche Sequenzen
-       - Achte auf:
-         - Unterschiedliche Längen
-         - Konsistente Struktur
-
-    4. Validierung
-
-       - Entferne unbrauchbare Daten
-         (z. B. zu kurze oder fehlerhafte Sequenzen)
-
-    5. Ausgabeformat
-
-       - Baue den Datensatz so, dass dein HMM direkt damit arbeiten kann
-       - Das Format sollst du selbst definieren
-
-    .. note::
-
-       Es gibt hier keine vorgegebene „richtige“ Lösung.
-       Wichtig ist, dass dein Datensatz konsistent und nutzbar ist.
-
-    .. tip::
-
-       Denke wie ein System-Designer:
-       Wie müssen Daten aussehen, damit Training und Inferenz sauber funktionieren?
-
-    .. warning::
-
-       Inkonsistente Datenstrukturen sind eine der häufigsten Fehlerquellen
-       beim Training von Sequenzmodellen.
-
-    Erweiterung (optional):
-    -----------------------
-
-    - Normalisierung der Daten
-    - Datenaugmentation
-    - Debug-Ausgaben oder Visualisierung
+    Optional können für jede gültige Originalsequenz zusätzliche,
+    augmentierte Sequenzen erzeugt werden. Der fertige Datensatz wird als
+    Pickle-Datei gespeichert.
 
     Parameters
     ----------
-    output_path : Path or str
-        Zielpfad für den erzeugten Trainingsdatensatz.
+    output_path : str or os.PathLike
+        Pfad, unter dem der erzeugte Datensatz als Pickle-Datei
+        gespeichert wird.
+
+    recordings_dir : str or os.PathLike, optional
+        Verzeichnis mit den aufgenommenen Gestendaten. Jeder Unterordner
+        entspricht einem Klassenlabel und enthält die zugehörigen
+        Aufnahme-Dateien. Der Standardwert ist ``"recordings"``.
+
+    augment : int, optional
+        Anzahl der zusätzlich zu erzeugenden augmentierten Kopien pro
+        gültiger Originalsequenz. Bei ``0`` wird keine Datenaugmentation
+        durchgeführt. Der Standardwert ist ``0``.
+
+    Returns
+    -------
+    dict
+        Erzeugter Datensatz mit den folgenden Einträgen:
+
+        ``"X"``
+            Hintereinander gespeicherte Feature-Vektoren aller Sequenzen.
+
+        ``"y"``
+            Klassenlabel jeder Original- oder augmentierten Sequenz.
+
+        ``"lengths"``
+            Anzahl der Feature-Vektoren jeder einzelnen Sequenz. Die Summe
+            der Werte entspricht der Gesamtzahl der Einträge in ``X``.
+
+    Notes
+    -----
+    Die Funktion erwartet für jede Aufnahme ein mit ``pickle`` gespeichertes
+    Dictionary mit dem Schlüssel ``"preprocessor"``. Dieser Schlüssel muss
+    eine Folge von Frames enthalten. Jeder gültige Frame muss wiederum einen
+    Eintrag namens ``"preprocessor"`` enthalten.
+
+    Pro Aufnahme wird ausschließlich die letzte gültige und nicht leere
+    Preprocessor-Sequenz verwendet. Vollständig leere oder ungültige
+    Aufnahmen werden übersprungen.
+
+    Die Datenaugmentation verwendet die Funktion ``augment_sequence``.
+    Diese muss vor dem Aufruf dieser Funktion definiert oder importiert sein.
+
+    Raises
+    ------
+    FileNotFoundError
+        Wenn ``recordings_dir`` oder eine erwartete Aufnahme-Datei nicht
+        existiert.
+
+    KeyError
+        Wenn eine geladene Aufnahme nicht die erwarteten
+        ``"preprocessor"``-Einträge enthält.
+
+    pickle.UnpicklingError
+        Wenn eine Aufnahme-Datei keine gültige Pickle-Datei ist.
     """
     X = []
     y = []
