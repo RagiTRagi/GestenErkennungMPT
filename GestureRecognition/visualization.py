@@ -1,3 +1,11 @@
+"""
+Werkzeuge zur Sichtung des aufgenommenen Datensatzes.
+
+Enthält Funktionen, um die Trajektorien des Datensatzes darzustellen,
+die Güte des HMM-Klassifikators zu messen und einzelne Aufnahmen
+abzuspielen.
+"""
+
 import os
 import pickle
 import random
@@ -10,10 +18,25 @@ from hmmclassifier import HMMClassifier
 
 def visualize_dataset(dataset_path="dataset.pkl", max_per_class=5):
     """
-    Zeigt die Trajektorien aus dem Datensatz an, ein Feld pro Buchstabe.
+    Zeigt die Trajektorien des Datensatzes als Raster, ein Feld pro Buchstabe.
 
-    So sieht man schnell, ob die Buchstaben unterscheidbar sind und
-    ob es Ausreisser gibt.
+    Der Datensatz wird geladen, anhand von ``lengths`` wieder in einzelne
+    Sequenzen zerschnitten und nach Buchstabe gruppiert. Pro Buchstabe
+    werden bis zu ``max_per_class`` Beispiele übereinander gezeichnet.
+    So sieht man auf einen Blick, ob die Buchstaben unterscheidbar sind
+    und ob es Ausreißer gibt.
+
+    Die y-Achse wird invertiert, da die Punkte in Bildkoordinaten
+    vorliegen, y also nach unten zeigt.
+
+    Parameters
+    ----------
+    dataset_path : str, optional
+        Pfad zur Pickle-Datei mit den Schlüsseln ``X``, ``y`` und
+        ``lengths``.
+    max_per_class : int, optional
+        Maximale Anzahl an Beispielen, die pro Buchstabe gezeichnet
+        werden.
     """
     with open(dataset_path, "rb") as f:
         dataset = pickle.load(f)
@@ -65,11 +88,35 @@ def visualize_dataset(dataset_path="dataset.pkl", max_per_class=5):
 def evaluate_classifier(dataset_path="dataset.pkl", test_ratio=0.3, seed=42,
                         n_components=10):
     """
-    Testet den Klassifikator: Accuracy + Confusion Matrix.
+    Misst die Güte des Klassifikators: Accuracy und Confusion Matrix.
 
-    Die Daten werden in Training und Test geteilt. Trainiert wird nur
-    auf den Trainingsdaten, gemessen nur auf den Testdaten (die das
-    Modell noch nie gesehen hat).
+    Die Sequenzen werden pro Buchstabe geteilt, sodass von jedem
+    Buchstaben ein Anteil von ``test_ratio`` (mindestens aber eine
+    Sequenz) in den Test wandert. Trainiert wird ein
+    :class:`HMMClassifier` nur auf den Trainingsdaten, gemessen wird nur
+    auf den Testdaten, die das Modell noch nie gesehen hat.
+
+    Die Accuracy wird auf der Konsole ausgegeben, die Confusion Matrix
+    als Heatmap gezeichnet (Zeile = echter Buchstabe, Spalte =
+    vorhergesagter Buchstabe).
+
+    Parameters
+    ----------
+    dataset_path : str, optional
+        Pfad zur Pickle-Datei mit den Schlüsseln ``X``, ``y`` und
+        ``lengths``.
+    test_ratio : float, optional
+        Anteil der Sequenzen pro Buchstabe, der in den Test geht.
+    seed : int, optional
+        Startwert für das Mischen, damit der Split reproduzierbar ist.
+    n_components : int, optional
+        Anzahl der versteckten Zustände pro HMM.
+
+    Returns
+    -------
+    float
+        Accuracy auf den Testdaten, also der Anteil der richtig
+        erkannten Sequenzen.
     """
     with open(dataset_path, "rb") as f:
         dataset = pickle.load(f)
@@ -162,8 +209,24 @@ def evaluate_classifier(dataset_path="dataset.pkl", test_ratio=0.3, seed=42,
 
 def replay_recordings(recordings_dir="recordings", label=None, pause=0.03):
     """
-    Spielt die aufgenommenen Buchstaben ab, Punkt fuer Punkt wie beim
-    echten Schreiben. Mit label="A" wird nur ein Buchstabe abgespielt.
+    Spielt aufgenommene Buchstaben ab, Punkt für Punkt wie beim
+    echten Schreiben.
+
+    Durchläuft die Label-Ordner unter ``recordings_dir`` und lädt jede
+    Aufnahme. Verwendet wird jeweils die letzte gültige Trajektorie einer
+    Aufnahme, also der Stand am Ende des Schreibvorgangs; leere Aufnahmen
+    werden übersprungen. Anschließend wird die Trajektorie in
+    Zweierschritten nachgezeichnet.
+
+    Parameters
+    ----------
+    recordings_dir : str, optional
+        Ordner mit je einem Unterordner pro Buchstabe.
+    label : str, optional
+        Wird ein Buchstabe angegeben, z.B. ``"A"``, wird nur dieser
+        abgespielt. Sonst werden alle abgespielt.
+    pause : float, optional
+        Wartezeit in Sekunden zwischen zwei Zeichenschritten.
     """
     # alle Label-Ordner durchgehen (oder nur einen bestimmten)
     labels = sorted(os.listdir(recordings_dir))
