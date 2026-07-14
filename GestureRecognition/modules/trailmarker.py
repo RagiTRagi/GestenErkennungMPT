@@ -112,6 +112,7 @@ class TrailMarker(Module):
         self.lost_frames = 0
         self.max_lostframe = 30
         self.finger_index = 8  # 8 = Index Finger
+        self.distance_threshold = 2
 
         self.trajectory = deque(maxlen=2)
         self.final_trajectory = deque(maxlen=250)
@@ -220,9 +221,13 @@ class TrailMarker(Module):
             self.finger_index
         ]  # Landmarken des Fingers extrahieren
         pip = landmarks[0][self.finger_index - 2]
-        extended_finger = finger_landmark.y < pip.y
+        finger_distance = np.sqrt((pip.y - finger_landmark.y)**2)
+        extended_finger = (finger_landmark.y < pip.y and finger_distance<self.distance_threshold)
+        
 
-        if not extended_finger:
+
+
+        if not extended_finger: 
             self.draw_trajectory(galy)
             return {"galy": galy}
 
