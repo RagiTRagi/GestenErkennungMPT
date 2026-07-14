@@ -86,20 +86,17 @@ def data_labeling():
 
             print("Save file press 's'\nDiscard file press 'x'")
             if msvcrt.getch() == b"s":
-                cwd = os.getcwd()
-                data_dir = os.path.dirname(os.path.join("..", cwd))
+
                 folder = "recordings"
-                data_path = os.path.join(data_dir, folder)
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                data_path = os.path.join(script_dir, folder)
+
+                new_dir = os.path.join(data_path, label.title())
+                os.makedirs(new_dir, exist_ok=True)
 
                 random1 = np.random.randint(10000, 100000000)
                 random2 = np.random.randint(1000, 1000000)
                 filename = f"{label.title()}_{random1}_{random2}.pickle"
-
-                try:
-                    new_dir = os.path.join(data_path, label.title())
-                    os.mkdir(new_dir)
-                except FileExistsError:
-                    print("Directory already exists.")
 
                 filepath = os.path.join(new_dir, filename)
                 source_path = "record/test.pickle"
@@ -235,6 +232,7 @@ def dataset_building(output_path, recordings_dir="recordings", augment=0):
 
 if __name__ == "__main__":
     # normaler Datensatz (fuer die Evaluation)
+    data_labeling()
     dataset_building("dataset.pkl")
     # Datensatz mit Augmentation (fuers Training: pro Aufnahme 2 Kopien extra)
     dataset_building("dataset_augmented.pkl", augment=2)

@@ -2,8 +2,6 @@ from SignalHub import Module, get_nested_key
 from collections import deque
 import numpy as np
 from SignalHub import GALY
-from SignalHub.mode import EngineMode
-import msvcrt
 
 class TrailMarker(Module):
     """
