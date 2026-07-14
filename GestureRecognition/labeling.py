@@ -4,6 +4,7 @@ import numpy as np
 import pickle
 import shutil
 import subprocess
+from MPT_utils import augment_sequence
 
 
 def data_labeling():
@@ -105,29 +106,6 @@ def data_labeling():
                 shutil.copy(source_path, filepath)
             else:
                 continue
-
-
-def augment_sequence(seq):
-    """
-    Macht aus einer Trajektorie eine leicht veraenderte Kopie:
-    kleine Drehung + etwas Rauschen. So bekommt das Modell mehr
-    Trainingsdaten und wird robuster gegen kleine Abweichungen.
-    """
-    seq = np.asarray(seq)
-
-    # kleine zufaellige Drehung (ca. -8 bis +8 Grad)
-    angle = np.random.uniform(-0.15, 0.15)
-    cos_a = np.cos(angle)
-    sin_a = np.sin(angle)
-    x = seq[:, 0] * cos_a - seq[:, 1] * sin_a
-    y = seq[:, 0] * sin_a + seq[:, 1] * cos_a
-
-    new_seq = np.column_stack([x, y])
-
-    # etwas Rauschen auf jeden Punkt
-    new_seq = new_seq + np.random.normal(0, 0.02, new_seq.shape)
-    return new_seq
-
 
 def dataset_building(output_path, recordings_dir="recordings", augment=0):
     """
