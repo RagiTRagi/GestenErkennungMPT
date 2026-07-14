@@ -475,12 +475,11 @@ class HMMClassifier:
 def main():
 
     """
-    Trainiere oder evaluiere den HMM-basierten Sequenzklassifikator.
+    Trainiere den HMM-basierten Sequenzklassifikator.
 
     Das Programm lädt einen serialisierten Datensatz, teilt die enthaltenen
     Sequenzen in Trainings-, Validierungs- und Testdaten auf und führt
-    anschließend entweder eine reine Evaluation oder ein vollständiges
-    Modelltraining durch.
+    anschließend die Hyperparameteroptimierung und das Modelltraining durch.
 
     Der Datensatz muss als Pickle-Datei gespeichert sein und mindestens die
     folgenden Einträge enthalten:
@@ -501,15 +500,7 @@ def main():
 
         python hmm_classifier.py eigener_datensatz.pkl
 
-    Mit dem Argument ``--eval`` wird kein neues Modell trainiert. Stattdessen
-    wird das bereits gespeicherte Modell aus ``data/hmm.pkl`` geladen und auf
-    dem Testdatensatz evaluiert::
-
-        python hmm_classifier.py --eval
-
-        python hmm_classifier.py eigener_datensatz.pkl --eval
-
-    Beim vollständigen Training wird folgender Ablauf durchgeführt:
+    Beim Training wird folgender Ablauf durchgeführt:
 
     1. Die Sequenzen werden im Verhältnis 70 Prozent Training,
        15 Prozent Validierung und 15 Prozent Test aufgeteilt.
@@ -527,16 +518,8 @@ def main():
     """
 
     dataset_path = "dataset.pkl"
-    eval_only = False
-
     if len(sys.argv) > 1:
-        if "--eval" in sys.argv:
-            eval_only = True
-            remaining_args = [arg for arg in sys.argv[1:] if arg != "--eval"]
-            if remaining_args:
-                dataset_path = remaining_args[0]
-        else:
-            dataset_path = sys.argv[1]
+        dataset_path = sys.argv[1]
 
     print("Lade Daten:", dataset_path)
     with open(dataset_path, "rb") as f:
@@ -550,7 +533,7 @@ def main():
     (X_train, X_val, X_test, 
      y_train, y_val, y_test, 
      lengths_train, lengths_val, lengths_test) = split_hmm_sequences_3way(
-        X_full, y_full, lengths_full, val_size=0.15, test_size=0.15, random_state=42
+        X_full, y_full, lengths_full, val_size=0.15, test_size=0.15, random_state=179
     )
 
     print("Augmentiere Trainingsdaten (Faktor 2)...")
@@ -579,20 +562,6 @@ def main():
     lengths_train = lengths_train_augmented
 
     print(f"Training nach Augmentation: {len(lengths_train)} Sequenzen")
-
-    if eval_only:
-        model_path = "data/hmm.pkl"
-        if not os.path.exists(model_path):
-            print(f"Fehler: Kein trainiertes Modell unter '{model_path}' gefunden! Bitte erst einmal normal trainieren.")
-            sys.exit(1)
-            
-        print(f"Lade existierendes Modell aus {model_path} für Schnelltest...")
-        loaded_clf = HMMClassifier.load(model_path)
-        
-        print("Generiere Confusion Matrix...")
-        plot_evaluation_results(loaded_clf, X_test, y_test, lengths_test)
-        print("Schnelltest beendet.")
-        sys.exit(0)
 
     def objective(trial):
 

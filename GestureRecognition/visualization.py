@@ -8,12 +8,12 @@ abzuspielen.
 
 import os
 import pickle
-import random
 
 import numpy as np
 import matplotlib.pyplot as plt
 
 from hmmclassifier import HMMClassifier
+from MPT_utils import plot_evaluation_results, split_hmm_sequences_3way
 
 
 def visualize_dataset(dataset_path="dataset.pkl", max_per_class=5):
@@ -85,126 +85,47 @@ def visualize_dataset(dataset_path="dataset.pkl", max_per_class=5):
     plt.show()
 
 
-def evaluate_classifier(dataset_path="dataset.pkl", test_ratio=0.3, seed=42,
-                        n_components=10):
-    """
-    Misst die Güte des Klassifikators: Accuracy und Confusion Matrix.
+def evaluate_classifier(dataset_path="dataset.pkl", model_path="data/hmm.pkl",
+                        seed=179):
+    """Wertet ein bereits trainiertes HMM auf dem Testdatensatz aus.
 
-    Die Sequenzen werden pro Buchstabe geteilt, sodass von jedem
-    Buchstaben ein Anteil von ``test_ratio`` (mindestens aber eine
-    Sequenz) in den Test wandert. Trainiert wird ein
-    :class:`HMMClassifier` nur auf den Trainingsdaten, gemessen wird nur
-    auf den Testdaten, die das Modell noch nie gesehen hat.
-
-    Die Accuracy wird auf der Konsole ausgegeben, die Confusion Matrix
-    als Heatmap gezeichnet (Zeile = echter Buchstabe, Spalte =
-    vorhergesagter Buchstabe).
+    Die Funktion stellt mit :func:`split_hmm_sequences_3way` denselben
+    reproduzierbaren Testsplit wie das Trainingsskript her. Anschließend lädt
+    sie das vorhandene Modell und übergibt ausschließlich die Testdaten an
+    :func:`MPT_utils.plot_evaluation_results`. Es werden weder ein Modell
+    trainiert noch Optuna-Trials ausgeführt.
 
     Parameters
     ----------
     dataset_path : str, optional
-        Pfad zur Pickle-Datei mit den Schlüsseln ``X``, ``y`` und
-        ``lengths``.
-    test_ratio : float, optional
-        Anteil der Sequenzen pro Buchstabe, der in den Test geht.
+        Pickle-Datei mit den Schlüsseln ``X``, ``y`` und ``lengths``.
+    model_path : str, optional
+        Pickle-Datei des bereits trainierten :class:`HMMClassifier`.
     seed : int, optional
-        Startwert für das Mischen, damit der Split reproduzierbar ist.
-    n_components : int, optional
-        Anzahl der versteckten Zustände pro HMM.
+        Zufallswert des beim Training verwendeten Datensplits.
 
     Returns
     -------
-    float
-        Accuracy auf den Testdaten, also der Anteil der richtig
-        erkannten Sequenzen.
+    HMMClassifier
+        Das geladene und ausgewertete Modell.
     """
     with open(dataset_path, "rb") as f:
         dataset = pickle.load(f)
 
-    X = np.array(dataset["X"])
-    y = dataset["y"]
-    lengths = dataset["lengths"]
+    (_, _, X_test, _, _, y_test,
+     _, _, lengths_test) = split_hmm_sequences_3way(
+        np.asarray(dataset["X"]), dataset["y"], dataset["lengths"],
+        val_size=0.15, test_size=0.15, random_state=seed,
+    )
 
-    # Datensatz in einzelne Sequenzen zerschneiden
-    sequences = []
-    start = 0
-    for length in lengths:
-        sequences.append(X[start:start + length])
-        start = start + length
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(
+            f"Kein trainiertes Modell unter '{model_path}' gefunden."
+        )
 
-    # Train/Test-Split: von jedem Buchstaben kommt ein Teil in den Test
-    random.seed(seed)
-    train_idx = []
-    test_idx = []
-    for label in sorted(set(y)):
-        # alle Indizes von diesem Buchstaben sammeln
-        idx = []
-        for i in range(len(y)):
-            if y[i] == label:
-                idx.append(i)
-
-        random.shuffle(idx)
-        n_test = int(len(idx) * test_ratio)
-        if n_test == 0:
-            n_test = 1
-
-        test_idx = test_idx + idx[:n_test]
-        train_idx = train_idx + idx[n_test:]
-
-    # Trainingsdaten zusammenbauen
-    X_train = []
-    y_train = []
-    len_train = []
-    for i in train_idx:
-        X_train.extend(sequences[i])
-        y_train.append(y[i])
-        len_train.append(len(sequences[i]))
-
-    # Testdaten zusammenbauen
-    X_test = []
-    y_test = []
-    len_test = []
-    for i in test_idx:
-        X_test.extend(sequences[i])
-        y_test.append(y[i])
-        len_test.append(len(sequences[i]))
-
-    # Klassifikator NUR auf den Trainingsdaten trainieren
-    clf = HMMClassifier(n_components=n_components)
-    clf.fit(np.array(X_train), y_train, len_train)
-
-    # auf den Testdaten vorhersagen
-    y_pred = clf.predict(np.array(X_test), len_test)
-
-    # Accuracy = richtige / alle
-    correct = 0
-    for i in range(len(y_test)):
-        if y_test[i] == y_pred[i]:
-            correct = correct + 1
-    accuracy = correct / len(y_test)
-    print("Test-Accuracy:", accuracy)
-
-    # Confusion Matrix zaehlen (Zeile = echt, Spalte = vorhergesagt)
-    labels = list(clf.classes_)
-    cm = np.zeros((len(labels), len(labels)))
-    for i in range(len(y_test)):
-        row = labels.index(y_test[i])
-        col = labels.index(y_pred[i])
-        cm[row][col] = cm[row][col] + 1
-
-    # als Heatmap anzeigen
-    plt.figure(figsize=(9, 8))
-    plt.imshow(cm, cmap="Blues")
-    plt.xticks(range(len(labels)), labels)
-    plt.yticks(range(len(labels)), labels)
-    plt.xlabel("Vorhergesagt")
-    plt.ylabel("Echt")
-    plt.title("Confusion Matrix (Test-Accuracy = " + str(round(accuracy, 2)) + ")")
-    plt.colorbar()
-    plt.tight_layout()
-    plt.show()
-
-    return accuracy
+    classifier = HMMClassifier.load(model_path)
+    plot_evaluation_results(classifier, X_test, y_test, lengths_test)
+    return classifier
 
 
 def replay_recordings(recordings_dir="recordings", label=None, pause=0.03):
@@ -280,4 +201,4 @@ def replay_recordings(recordings_dir="recordings", label=None, pause=0.03):
 
 
 if __name__ == "__main__":
-    visualize_dataset()
+    evaluate_classifier("dataset.pkl", "data/hmm.pkl", seed=179)
