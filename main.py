@@ -1,7 +1,7 @@
 import argparse
 
 from GestureRecognition import run
-from GestureRecognition.labeling import data_labeling
+from GestureRecognition.labeling import data_labeling, dataset_building
 
 def main():
     """Startet wahlweise die Aufnahme oder die Gestenerkennung."""
@@ -15,6 +15,7 @@ def main():
     args, _ = parser.parse_known_args()
     if args.record:
         data_labeling()
+        dataset_building("dataset.pkl")
         return
 
     run(parser)
