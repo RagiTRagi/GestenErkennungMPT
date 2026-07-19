@@ -1,72 +1,33 @@
 import os
 import pickle
 from SignalHub import GALY, bgr, get_nested_key, Module
+import numpy as np
 
 from GestureRecognition.hmmclassifier import HMMClassifier
 
 
 class HMMModule(Module):
-    """
-    Modul zur Klassifikation von Gesten mittels Hidden Markov Models.
+    """Klassifiziert vorverarbeitete Gesten mit trainierten HMMs.
 
-    Dieses Modul erhält eine vorverarbeitete Fingertrajektorie vom
-    :class:`Preprocessor` Modul und verwendet ein trainiertes
-    Hidden-Markov-Modell, um eine Geste zu klassifizieren.
-
-    Ziel ist es, eine geladene Modellstruktur zu verwenden, um
-    eine Entscheidung über die aktuell ausgeführte Bewegung zu treffen
-    und das Ergebnis an das Framework zurückzugeben.
+    Das Modul empfängt normalisierte Trajektorien über das Signal
+    ``preprocessor``. Jede Trajektorie wird von den gespeicherten
+    Klassenmodellen bewertet. Das Label mit der höchsten Log-Likelihood wird
+    zusammen mit einer GALY-Visualisierung ausgegeben. Im Aufnahmemodus wird
+    kein Modell geladen und keine Klassifikation durchgeführt.
     """
 
     def __init__(self, outputSignal="markov", model_path="data/hmm.pkl", **kwargs):
-        """
-        Konstruktor des Moduls.
-
-        Ziel ist es, das Modul beim Framework korrekt zu registrieren.
-
-        Hinweise
-        --------
-        - Ein Modul muss definieren, **welche Signale es empfangen möchte**.
-        - Diese werden über ``inputSignals`` angegeben.
-        - Nur Signale, die hier subscribed werden, erscheinen später im
-          ``data`` Dictionary der Methoden :meth:`start` und :meth:`step`.
-
-        Für dieses Modul werden unter anderem folgende Signale benötigt:
-
-        - ``config`` : Systemkonfiguration
-        - ``preprocessor`` : normalisierte Trajektorien
-
-        Zusätzlich muss ein **Output-Schema** definiert werden.
-
-        Output Schema
-        -------------
-        Das Modul erzeugt ein Signal mit dem Namen ``markov``.
-
-        Dieses Signal enthält Informationen über die erkannte Geste
-        sowie deren Klassifikationsscore.
-
-        Beispiel:
-
-        ``outputSchema={"type": "object", "properties": {outputSignal: {}}}``
-
-        .. note::
-           Die Basisklasse :class:`Module` erwartet beim Aufruf von
-           ``super().__init__`` unter anderem:
-
-           - ``inputSignals``
-           - ``outputSchema``
-           - ``name`` des Moduls
+        """Registriert die Signale und speichert den Modellpfad.
 
         Parameters
         ----------
         outputSignal : str, optional
-            Name des erzeugten Output-Signals.
-
+            Name des Signals, unter dem das erkannte Label ausgegeben wird.
         model_path : str, optional
-            Pfad zu einem gespeicherten HMM-Modell.
-
+            Pfad zu einem mit :meth:`HMMClassifier.save` gespeicherten Modell.
         **kwargs
-            Weitere Parameter, die an :class:`Module` weitergegeben werden.
+            Zusätzliche Parameter für die Kompatibilität mit der
+            Modulerzeugung. Sie werden derzeit nicht ausgewertet.
         """
         super().__init__(
             inputSignals=["config", "preprocessor"],
@@ -77,45 +38,64 @@ class HMMModule(Module):
         self.outputSignal = outputSignal
         self.model_path = model_path
 
-    def start(self, data):
+    def _draw_prediction_overlay(self, galy, best_label, best_probability):
+        """Zeichnet das erkannte Label und dessen Konfidenz in ein Overlay.
+
+        Parameters
+        ----------
+        galy : GALY
+            Zeichenobjekt, dem die beiden Textzeilen hinzugefügt werden.
+        best_label : object
+            Label der Klasse mit dem höchsten Modellscore.
+        best_probability : float
+            Durch Softmax normalisierter Score des besten Labels im Bereich
+            von 0 bis 1.
+
+        Returns
+        -------
+        None
+            Die Zeichenbefehle werden direkt in ``galy`` eingetragen.
         """
-        Initialisierung des Moduls.
+        x = 24
+        y = 52
 
-        Diese Methode wird einmal beim Start des Moduls ausgeführt.
+        title = str(best_label)
+        subtitle = f"Confidence: {best_probability:.1%}"
 
-        Ziel ist es, ein zuvor trainiertes Hidden-Markov-Modell zu laden,
-        das später zur Klassifikation verwendet wird.
+        galy.putText(title, (x, y), fontScale=2.2, color=bgr("#fefcf7"), thickness=5)
 
-        Hinweise
-        --------
-        - Das Modell kann aus einer Datei geladen werden.
-        - Typischerweise wird dafür eine Klassenmethode verwendet,
-          die ein gespeichertes Modell rekonstruiert.
-        - Das geladene Modell sollte als Attribut des Moduls gespeichert
-          werden, damit es in :meth:`step` verwendet werden kann.
+        galy.putText(subtitle, (x, y + 42), fontScale=1.1, color=bgr("#ff500b"), thickness=3)
 
-        .. tip::
-           Trenne klar zwischen:
-            - Modell laden (``start``)
-            - Modell anwenden (``step``)
+    def start(self, data):
+        """Lädt die gespeicherten HMM-Klassenmodelle.
 
-        .. warning::
-           Stelle sicher, dass:
-            - der Pfad korrekt ist
-            - das Modell zum erwarteten Datenformat passt
+        Ist in der Konfiguration ``mode`` auf ``"record"`` gesetzt, wird das
+        Laden übersprungen und ``self.model`` auf ``None`` gesetzt. In allen
+        anderen Modi werden die Modelle und Klassenlabels des gespeicherten
+        :class:`HMMClassifier` übernommen.
 
         Parameters
         ----------
         data : dict
-            Eingabedaten des Frameworks.
+            Framework-Daten mit dem optionalen Konfigurationswert ``mode``.
 
         Returns
         -------
         dict
-            Ein leeres Dictionary.
+            Leeres Dictionary, da während der Initialisierung kein Signal
+            erzeugt wird.
+
+        Raises
+        ------
+        FileNotFoundError
+            Wenn außerhalb des Aufnahmemodus keine Modelldatei unter
+            ``model_path`` vorhanden ist.
         """
         config = data.get("config", {})
         mode = get_nested_key("mode", config) if isinstance(config, dict) else None
+
+        # letzte Prognose merken, damit sie dauerhaft im Bild steht
+        self.last_text = None
 
         if mode == "record":
             self.model = None
@@ -133,99 +113,72 @@ class HMMModule(Module):
         return {}
 
     def step(self, data):
-        """
-        Verarbeitung eines einzelnen Frames.
+        """Klassifiziert die aktuelle vorverarbeitete Trajektorie.
 
-        Ziel ist es, eine vorverarbeitete Trajektorie zu klassifizieren
-        und die wahrscheinlichste Geste zu bestimmen.
-
-        Hinweise
-        --------
-        - Greife auf das ``preprocessor`` Signal zu.
-        - Falls keine Trajektorie vorhanden ist, kann die Verarbeitung
-          übersprungen werden.
-        - Das geladene HMM-Modell kann anschließend verwendet werden,
-          um eine Entscheidung für die aktuelle Bewegung zu berechnen.
-        - Das Ergebnis enthält typischerweise Scores für mehrere Klassen.
-        - Die Klasse mit dem höchsten Score kann als Ergebnis gewählt werden.
-
-        Zusätzlich kann eine Visualisierung erzeugt werden:
-
-        - Erzeuge ein :class:`GALY` Objekt.
-        - Lege eine neue Zeichenebene an.
-        - Verwende :meth:`putText`, um Score und Label darzustellen.
-        - Für die Skalierung der Zeichenebene können Parameter aus der
-          Konfiguration über :meth:`get_nested_key` gelesen werden.
-
-        .. tip::
-           Typischer Ablauf:
-            1. Daten prüfen (existiert eine Sequenz?)
-            2. Modell anwenden
-            3. Scores interpretieren
-            4. Ergebnis visualisieren
-
-        .. note::
-           Du entscheidest selbst:
-            - wie du Scores darstellst
-            - ob du nur das beste Label oder mehrere Kandidaten zeigst
-
-        .. warning::
-           Achte darauf, dass:
-            - das Eingabeformat exakt zum Trainingsformat passt
-            - keine leeren oder fehlerhaften Sequenzen verarbeitet werden
+        Für jedes Klassenmodell wird die Log-Likelihood der Trajektorie
+        berechnet. Die Scores werden mit einer Softmax-Transformation in
+        relative Werte umgerechnet, die ausschließlich der Anzeige als
+        Konfidenz dienen. Sie sind keine kalibrierten Wahrscheinlichkeiten.
 
         Parameters
         ----------
         data : dict
-            Enthält unter anderem:
-
-            - ``preprocessor`` : normalisierte Trajektorie
-            - ``config`` : Systemkonfiguration
+            Framework-Daten mit der normalisierten Trajektorie unter
+            ``preprocessor``.
 
         Returns
         -------
         dict
-            Soll die erkannte Geste sowie optional Visualisierungsdaten
-            enthalten.
-
-            Beispiel:
-
-            ``return {outputSignal: result, "galy": galy}``
+            Bei einer gültigen Vorhersage das beste Label unter dem
+            konfigurierten Ausgabesignal und das Text-Overlay unter ``galy``.
+            Vor der ersten Vorhersage wird ein leeres Dictionary ausgegeben.
+            In späteren Frames ohne neue Trajektorie enthält die Ausgabe das
+            Label ``None`` und ein leeres GALY-Objekt.
         """
-        
+
         trajectory = data["preprocessor"]
 
-        if trajectory is None or self.model is None:
+        best_label = None
+        if trajectory is not None and self.model is not None:
+            scores = {}
+            for label, hmm in self.model.items():
+                scores[label] = hmm.score(trajectory)
+
+            best_label = max(scores, key=scores.get)
+
+            labels = list(scores.keys())
+            score_values = np.array([scores[label] for label in labels])
+
+            score_values = score_values - np.max(score_values)
+            exp_scores = np.exp(score_values)
+            probability_values = exp_scores / np.sum(exp_scores)
+
+            probabilities = {
+                label: float(probability)
+                for label, probability in zip(labels, probability_values)
+            }
+
+            best_probability = probabilities[best_label]
+            self.last_text = f"{best_label}: {best_probability:.2%}"
+
+        if self.last_text is None:
             return {}
-        
-        scores = {}
-        for label, hmm in self.model.items():
-            scores[label] = hmm.score(trajectory)
-        best_label = max(scores, key=scores.get)
 
         galy = GALY()
-        galy.putText(f"{best_label}: {scores[best_label]}", (20, 40))
-
+        if best_label is not None and best_probability is not None:
+            self._draw_prediction_overlay(galy, best_label, best_probability)
         return {self.outputSignal: best_label, "galy": galy}
 
     def stop(self, data):
-        """
-        Wird aufgerufen, wenn das Modul beendet wird.
-
-        Ziel ist es, bei Bedarf interne Zustände zurückzusetzen
-        oder Ressourcen freizugeben.
-
-        Hinweise
-        --------
-        - In vielen Fällen ist keine spezielle Bereinigung notwendig.
-
-        .. note::
-           Diese Methode ist optional, kann aber relevant werden,
-           wenn Modelle oder externe Ressourcen verwaltet werden.
+        """Beendet das Modul ohne zusätzliche Aufräumarbeiten.
 
         Parameters
         ----------
         data : dict
-            Letzte übergebene Daten des Frameworks.
+            Letzte Framework-Daten. Sie werden nicht verwendet.
+
+        Returns
+        -------
+        None
         """
         pass
