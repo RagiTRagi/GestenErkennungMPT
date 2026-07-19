@@ -70,10 +70,11 @@ class Preprocessor(Module):
         """
         Verarbeitet einen einzelnen Frame.
 
-        Wurde eine Hand erkannt, wird die Landmarke ``finger_idx`` an
-        die Trajektorie angehängt. Ohne erkannte Hand zählt
-        ``lost_count`` hoch; nach mehr als ``max_lost`` Frames gilt die
-        Geste als abgebrochen und die Trajektorie wird geleert.
+        Wurde eine Hand erkannt und der konfigurierte Finger ist
+        ausgestreckt, wird die Landmarke ``finger_idx`` an die
+        Trajektorie angehängt. Ohne erkannte Hand zählt ``lost_count``
+        hoch; nach mehr als ``max_lost`` Frames gilt die Geste als
+        abgebrochen und die Trajektorie wird geleert.
 
         Sobald mindestens ``min_steps`` Punkte vorliegen, wird die
         Trajektorie normalisiert: Der Mittelwert wird abgezogen, sodass
@@ -101,9 +102,17 @@ class Preprocessor(Module):
         detector_result = data.get("detector")
 
         if detector_result is not None and detector_result.handedness:
-            lm = detector_result.hand_landmarks[0][self.finger_idx]
-            self.trajectory.append((lm.x, lm.y))
-            self.lost_count = 0
+            landmarks = detector_result.hand_landmarks
+            finger_landmark = landmarks[0][self.finger_idx]
+            pip_landmark = landmarks[0][self.finger_idx - 2]
+
+            if finger_landmark.y <= pip_landmark.y:
+                self.trajectory.append((finger_landmark.x, finger_landmark.y))
+                self.lost_count = 0
+            else:
+                self.lost_count += 1
+                if self.lost_count > self.max_lost:
+                    self.trajectory.clear()
         else:
             self.lost_count += 1
             if self.lost_count > self.max_lost:
